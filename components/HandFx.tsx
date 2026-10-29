@@ -1,10 +1,12 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { createRng, RED_SUITS, SUITS, type Suit } from "@/lib/cards";
 import { HAND_INFO, type HandType } from "@/lib/hands";
+import { SKINS, type Skin } from "@/lib/skins";
 import { SuitGlyph } from "./CardArt";
+import { PlayBurst } from "./SkinFx";
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 
@@ -21,14 +23,15 @@ export const FX_HOLD: Record<HandType, number> = {
   straight_flush: 1500,
 };
 
-function color(suit: Suit) {
-  return RED_SUITS.includes(suit) ? "#ff2a1f" : "#ffffff";
-}
+/** The skin of the player whose combination this is; colors every glyph and streak. */
+const FxSkin = createContext<Skin>(SKINS.classic);
 
 function Glyph({ suit, size }: { suit: Suit; size: number }) {
+  const skin = useContext(FxSkin);
+  const fill = RED_SUITS.includes(suit) ? skin.red : skin.back.line;
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.45)]">
-      <SuitGlyph suit={suit} x={12} y={12} size={22} color={color(suit)} />
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden style={{ filter: `drop-shadow(0 6px 14px rgba(0,0,0,0.45)) drop-shadow(0 0 10px ${skin.red}66)` }}>
+      <SuitGlyph suit={suit} x={12} y={12} size={22} color={fill} />
     </svg>
   );
 }
@@ -79,13 +82,14 @@ function Pulse({ suit, size }: { suit: Suit; size: number }) {
 
 /** Horizontal speed streaks sweeping across, for straights. */
 function Streaks() {
+  const skin = useContext(FxSkin);
   return (
     <>
       {[-90, -45, 0, 45, 90].map((y, i) => (
         <motion.div
           key={y}
-          className="absolute h-1.5 w-[60vw] rounded-full bg-gradient-to-r from-transparent via-paper to-signal"
-          style={{ top: `calc(50% + ${y}px)` }}
+          className="absolute h-1.5 w-[60vw] rounded-full"
+          style={{ top: `calc(50% + ${y}px)`, background: `linear-gradient(90deg, transparent, ${skin.back.line}, ${skin.red})` }}
           initial={{ opacity: 0, transform: "translateX(-120vw)" }}
           animate={{ opacity: [0, 1, 0], transform: "translateX(120vw)" }}
           transition={{ duration: 0.7, ease: "easeInOut", delay: i * 0.06 }}
@@ -147,19 +151,25 @@ interface Props {
   suit: Suit;
   /** Changes for each new effect so it replays. */
   id: number;
+  /** Skin of the player who made the combination. */
+  skin?: Skin;
 }
 
 /** Full-screen flourish when a combination is revealed. Pointer-transparent, never blocks input. */
-export default function HandFx({ hand, suit, id }: Props) {
+export default function HandFx({ hand, suit, id, skin = SKINS.classic }: Props) {
   const reduce = useReducedMotion();
   if (hand === "high_card") return null;
   const big = FX_HOLD[hand] >= 1000;
 
   return (
+    <FxSkin.Provider value={skin}>
     <div key={id} className="pointer-events-none fixed inset-0 z-40 grid place-items-center overflow-hidden" aria-hidden>
+      {/* From Three of a Kind up, the skin's own flourish joins in. */}
+      {FX_HOLD[hand] >= FX_HOLD.three_kind && <PlayBurst skin={skin} />}
       {big && !reduce && (
         <motion.div
-          className="absolute inset-0 bg-signal"
+          className="absolute inset-0"
+          style={{ background: skin.red }}
           initial={{ opacity: 0.35 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.5, ease: EASE_OUT }}
@@ -197,7 +207,8 @@ export default function HandFx({ hand, suit, id }: Props) {
         </>
       )}
       <motion.p
-        className={`absolute bottom-[18%] rounded-full px-6 py-2 font-display text-paper ${big ? "bg-signal text-3xl sm:text-5xl" : "bg-ink text-xl sm:text-3xl"}`}
+        className={`absolute bottom-[18%] rounded-full px-6 py-2 font-display ${big ? "text-3xl sm:text-5xl" : "text-xl sm:text-3xl"}`}
+        style={big ? { background: skin.red, color: skin.paper } : { background: skin.back.base, color: skin.back.line, boxShadow: `0 0 0 2px ${skin.back.line}` }}
         initial={{ opacity: 0, transform: "scale(1.6) rotate(-6deg)" }}
         animate={{ opacity: [0, 1, 1, 0], transform: ["scale(1.6) rotate(-6deg)", "scale(1) rotate(-2deg)", "scale(1) rotate(-2deg)", "scale(0.95) rotate(-2deg)"] }}
         transition={{ duration: Math.max(0.9, FX_HOLD[hand] / 1000 + 0.4), times: [0, 0.2, 0.8, 1], ease: EASE_OUT }}
@@ -205,5 +216,6 @@ export default function HandFx({ hand, suit, id }: Props) {
         {HAND_INFO[hand].label}!
       </motion.p>
     </div>
+    </FxSkin.Provider>
   );
 }

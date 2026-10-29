@@ -19,6 +19,10 @@ export interface Skin {
   panel: string;
   /** Fill of portrait heads. */
   figure: string;
+  /** Table behind the cards on your screen, picked to contrast with the card faces. */
+  board: string;
+  /** Opacity of the card outline; dark faces need a stronger edge. */
+  edge: number;
   back: { base: string; a: string; b: string; line: string; pattern: BackPattern };
 }
 
@@ -33,6 +37,8 @@ export const SKINS: Record<SkinId, Skin> = {
     red: "#ff2a1f",
     panel: "#e8e8e6",
     figure: "#ffffff",
+    board: "#000000",
+    edge: 0.15,
     back: { base: "#000000", a: "#000000", b: "#ff2a1f", line: "#ffffff", pattern: "stripes" },
   },
   blueprint: {
@@ -45,6 +51,8 @@ export const SKINS: Record<SkinId, Skin> = {
     red: "#fde047",
     panel: "#1e40af",
     figure: "#2563eb",
+    board: "#0b1b3f",
+    edge: 0.35,
     back: { base: "#1e3a8a", a: "#1e3a8a", b: "#3b82f6", line: "#ffffff", pattern: "grid" },
   },
   sakura: {
@@ -57,6 +65,8 @@ export const SKINS: Record<SkinId, Skin> = {
     red: "#e11d74",
     panel: "#fbd5e2",
     figure: "#fff5f7",
+    board: "#3b0a24",
+    edge: 0.15,
     back: { base: "#831843", a: "#9d174d", b: "#f9a8d4", line: "#fff5f7", pattern: "petals" },
   },
   neon: {
@@ -69,6 +79,8 @@ export const SKINS: Record<SkinId, Skin> = {
     red: "#f472b6",
     panel: "#16162a",
     figure: "#0b0b14",
+    board: "#231a52",
+    edge: 0.45,
     back: { base: "#05050c", a: "#05050c", b: "#22d3ee", line: "#f472b6", pattern: "circuit" },
   },
   gold: {
@@ -81,6 +93,8 @@ export const SKINS: Record<SkinId, Skin> = {
     red: "#b8860b",
     panel: "#efdcb0",
     figure: "#fbf3e1",
+    board: "#2b2112",
+    edge: 0.2,
     back: { base: "#1a1408", a: "#1a1408", b: "#d4a537", line: "#f5d77a", pattern: "diamonds" },
   },
   void: {
@@ -93,6 +107,8 @@ export const SKINS: Record<SkinId, Skin> = {
     red: "#ff2a1f",
     panel: "#141414",
     figure: "#050505",
+    board: "#5a0f12",
+    edge: 0.45,
     back: { base: "#000000", a: "#000000", b: "#ffffff", line: "#ff2a1f", pattern: "stars" },
   },
 };

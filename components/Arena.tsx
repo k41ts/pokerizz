@@ -249,7 +249,14 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
 
   return (
     <div className="flex flex-col gap-4">
-      {fx && <HandFx id={fx.id} hand={result.scores[fx.side].hand} suit={result.scores[fx.side].scoring[0].suit} />}
+      {fx && (
+        <HandFx
+          id={fx.id}
+          hand={result.scores[fx.side].hand}
+          suit={result.scores[fx.side].scoring[0].suit}
+          skin={skinById(skins[fx.side])}
+        />
+      )}
       {sideView(them)}
       <div className="relative flex h-10 items-center justify-center">
         <div className="absolute inset-x-0 top-1/2 h-px bg-paper/15" />
@@ -332,7 +339,7 @@ export default function Arena({ view, me, skins, onImpact, onContinue }: ArenaPr
   }, [onImpact, result, reduce]);
 
   return (
-    <section ref={ref} className="relative flex sm:min-h-[260px] flex-col justify-center overflow-hidden rounded-[22px] bg-ink p-3 text-paper sm:rounded-[28px] sm:p-5">
+    <section ref={ref} className="relative flex sm:min-h-[260px] flex-col justify-center overflow-hidden rounded-[22px] p-3 text-paper sm:rounded-[28px] sm:p-5" style={{ background: skinById(skins[me]).board }}>
       <svg className="pointer-events-none absolute -right-24 -bottom-24 size-80 text-paper/[0.06]" viewBox="0 0 100 100" aria-hidden>
         <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" />
         <circle cx="50" cy="50" r="34" fill="none" stroke="currentColor" strokeDasharray="2 3" />

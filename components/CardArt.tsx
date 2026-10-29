@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { RED_SUITS, rankLabel, type Card, type Suit } from "@/lib/cards";
 import { useSkin, type Skin } from "@/lib/skins";
+import { renderPortrait } from "./Portraits";
 
 /** Suit glyphs drawn in a 24×24 box. */
 const SUIT_PATH: Record<Suit, string> = {
@@ -57,61 +58,6 @@ function Corner({ card, color, flip }: { card: Card; color: string; flip?: boole
   );
 }
 
-function King({ p }: { p: Skin }) {
-  const accent = p.red;
-  return (
-    <g>
-      <path d="M26 122 Q28 96 50 93 Q72 96 74 122 Z" fill={p.ink} />
-      <path d="M33 104 L41 98 M67 104 L59 98" stroke={accent} strokeWidth={2} />
-      <path d="M40 42 L42 27 L46.5 36 L50 22 L53.5 36 L58 27 L60 42 Z" fill={accent} />
-      <path d="M35 64 Q35 41 50 40 Q65 41 65 64 L63 80 Q50 89 37 80 Z" fill={p.figure} stroke={p.ink} strokeWidth={2.2} />
-      <rect x={37.5} y={56} width={25} height={7} rx={3.5} fill={p.ink} />
-      <rect x={41} y={58.6} width={18} height={1.8} rx={0.9} fill={accent} />
-      <path d="M41 70 h18 M43 74 h14" stroke={p.ink} strokeWidth={1.4} strokeLinecap="round" />
-      <path d="M44 84 L42 94 M56 84 L58 94 M50 87 V95" stroke={p.ink} strokeWidth={2} />
-      <circle cx={35} cy={60} r={2.2} fill={accent} />
-      <circle cx={65} cy={60} r={2.2} fill={accent} />
-    </g>
-  );
-}
-
-function Queen({ p }: { p: Skin }) {
-  const accent = p.red;
-  return (
-    <g>
-      <path d="M28 122 Q30 98 50 95 Q70 98 72 122 Z" fill={p.ink} />
-      <path d="M32 92 Q26 60 36 44 Q50 30 64 44 Q74 60 68 92 L62 84 Q66 62 58 52 L42 52 Q34 62 38 84 Z" fill={p.ink} />
-      <ellipse cx={50} cy={64} rx={13} ry={17} fill={p.figure} stroke={p.ink} strokeWidth={2} />
-      <path d="M41 61 Q44 59 47 61 M53 61 Q56 59 59 61" stroke={p.ink} strokeWidth={1.6} fill="none" strokeLinecap="round" />
-      <path d="M39 70 Q50 66 61 70 L59 80 Q50 86 41 80 Z" fill={p.ink} />
-      <path d="M43 75 h14" stroke={accent} strokeWidth={1.6} strokeLinecap="round" />
-      <circle cx={64} cy={62} r={9.5} fill={p.ink} />
-      <circle cx={64} cy={62} r={5.5} fill="none" stroke={accent} strokeWidth={2} />
-      <circle cx={64} cy={62} r={1.8} fill={accent} />
-      <path d="M38 47 Q50 36 64 52" stroke={p.ink} strokeWidth={3} fill="none" />
-      <path d="M33 108 h12 M55 108 h12" stroke={accent} strokeWidth={1.6} />
-    </g>
-  );
-}
-
-function Jack({ p }: { p: Skin }) {
-  const accent = p.red;
-  return (
-    <g>
-      <path d="M27 122 Q29 97 50 94 Q71 97 73 122 Z" fill={p.ink} />
-      <path d="M31 90 Q28 52 50 40 Q72 52 69 90 L61 92 Q63 70 50 66 Q37 70 39 92 Z" fill={p.ink} />
-      <path d="M38 62 Q38 50 50 49 Q62 50 62 62 L61 78 Q50 86 39 78 Z" fill={p.figure} stroke={p.ink} strokeWidth={2} />
-      <rect x={36} y={55} width={28} height={9} rx={4.5} fill={p.ink} />
-      <circle cx={44} cy={59.5} r={3.3} fill="none" stroke={accent} strokeWidth={1.8} />
-      <circle cx={56} cy={59.5} r={3.3} fill="none" stroke={accent} strokeWidth={1.8} />
-      <path d="M40 70 L60 70 L57 80 Q50 84 43 80 Z" fill={accent} />
-      <path d="M43 74 h14 M45 77 h10" stroke={p.ink} strokeWidth={1} />
-      <path d="M50 40 L50 30 M50 30 l5 -4" stroke={p.ink} strokeWidth={1.6} strokeLinecap="round" />
-      <circle cx={55} cy={26} r={1.8} fill={accent} />
-    </g>
-  );
-}
-
 function Ace({ suit, color, p }: { suit: Suit; color: string; p: Skin }) {
   return (
     <g>
@@ -129,7 +75,6 @@ function Face({ card, p }: { card: Card; p: Skin }) {
   const r = card.rank;
 
   if (r >= 11 && r <= 13) {
-    const Portrait = r === 13 ? King : r === 12 ? Queen : Jack;
     return (
       <>
         <rect x={20} y={14} width={60} height={112} rx={7} fill={p.panel} />
@@ -138,7 +83,7 @@ function Face({ card, p }: { card: Card; p: Skin }) {
         </clipPath>
         <g clipPath={`url(#clip-${card.id})`}>
           <path d="M20 40 L80 22 M20 64 L80 46" stroke={p.ink} strokeOpacity={0.08} strokeWidth={6} />
-          <Portrait p={p} />
+          {renderPortrait(p, r)}
         </g>
         <SuitGlyph suit={card.suit} x={70} y={24} size={10} color={color} />
       </>
@@ -240,7 +185,7 @@ function CardArt({ card, faceDown, skin }: { card?: Card; faceDown?: boolean; sk
         <Back p={p} />
       ) : (
         <>
-          <rect x={0.75} y={0.75} width={98.5} height={138.5} rx={9} fill={p.paper} stroke={p.ink} strokeOpacity={0.15} strokeWidth={1.5} />
+          <rect x={0.75} y={0.75} width={98.5} height={138.5} rx={9} fill={p.paper} stroke={p.ink} strokeOpacity={p.edge} strokeWidth={1.5} />
           <Face card={card} p={p} />
           <Corner card={card} color={color} />
           <Corner card={card} color={color} flip />
