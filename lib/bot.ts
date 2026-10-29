@@ -63,6 +63,8 @@ export type BotMove = { kind: "discard"; cards: Card[] } | { kind: "play"; cards
 const SAMPLES: Record<BotLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 24, 4: 48 };
 /** How much better (in expected points) a discard must look before the bot takes it. */
 const MARGIN: Record<BotLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 4, 4: 1 };
+/** How often a bot weighs its discards with sampling; otherwise it falls back to the simple rule. */
+const DEEP_CHANCE: Record<BotLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 0.3, 4: 1 };
 
 function chips(c: Card) {
   return c.rank === 14 ? 11 : Math.min(c.rank, 10);
@@ -139,7 +141,7 @@ export function botMove(hand: Card[], jokers: JokerId[], discardsLeft: number, p
     return { kind: "play", cards: best.cards };
   }
   if (level === 1 || discardsLeft <= 0) return { kind: "play", cards: best.cards };
-  if (level === 2) {
+  if (level === 2 || Math.random() >= DEEP_CHANCE[level]) {
     const toss = chooseDiscard(hand, jokers, discardsLeft);
     return toss ? { kind: "discard", cards: toss } : { kind: "play", cards: best.cards };
   }
