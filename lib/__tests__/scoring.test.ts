@@ -8,8 +8,9 @@ describe("scorePlay", () => {
     expect(score.chips).toBe(40);
     expect(score.base).toBe(30);
     expect(score.total).toBe(70);
-    // A kicker card doesn't score.
-    expect(scorePlay(cards("10S 10H KD KC 2C"), [])!.total).toBe(70);
+    // An extra card outside the combination still adds its points.
+    expect(scorePlay(cards("10S 10H KD KC 2C"), [])!.total).toBe(72);
+    expect(scorePlay(cards("8S 8H JD JC KS"), [])!.total).toBe(30 + 8 + 8 + 10 + 10 + 10);
   });
 
   it("card points: 2–9 face value, 10/J/Q/K = 10, A = 11", () => {
@@ -18,9 +19,11 @@ describe("scorePlay", () => {
     expect(scorePlay(cards("AS AH"), [])!.total).toBe(20 + 22);
   });
 
-  it("high card only scores the highest card", () => {
-    expect(scorePlay(cards("KS 5H 2D"), [])!.total).toBe(10 + 10);
-    expect(scorePlay(cards("AS 5H"), [])!.total).toBe(10 + 11);
+  it("high card counts every played card, but only the highest forms the combination", () => {
+    const score = scorePlay(cards("KS 5H 2D"), [])!;
+    expect(score.total).toBe(10 + 10 + 5 + 2);
+    expect(score.scoring.map((c) => c.rank)).toEqual([13]);
+    expect(scorePlay(cards("AS 5H"), [])!.total).toBe(10 + 11 + 5);
   });
 
   it("five-card hands score every card", () => {

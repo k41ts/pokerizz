@@ -189,7 +189,7 @@ const SLIDES = [
   },
   {
     title: "Hitung skor",
-    body: "Skor = nilai kombinasi + nilai kartunya. Angka 2–9 sesuai angkanya, 10/J/Q/K bernilai 10, As 11.",
+    body: "Skor = nilai kombinasi + nilai semua kartu yang kamu mainkan, termasuk kartu tambahan. Angka 2–9 sesuai angkanya, 10/J/Q/K bernilai 10, As 11.",
     Demo: ScoreDemo,
   },
   {

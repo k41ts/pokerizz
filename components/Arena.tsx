@@ -59,7 +59,9 @@ function buildBeats(result: RoundResult, order: PlayerIndex[]): Beat[] {
   for (const side of order) {
     const s = result.scores[side];
     beats.push({ kind: "label", side });
-    s.scoring.forEach((card, step) => beats.push({ kind: "chip", side, card, value: chipValue(card.rank), step }));
+    // Combination cards first, then the extra cards, which also add their points.
+    const extras = result.plays[side].filter((c) => !s.scoring.some((x) => x.id === c.id));
+    [...s.scoring, ...extras].forEach((card, step) => beats.push({ kind: "chip", side, card, value: chipValue(card.rank), step }));
     for (const b of s.bonuses) beats.push({ kind: "bonus", side, text: `${JOKERS[b.jokerId].icon} ${JOKERS[b.jokerId].name}`, value: b.amount });
     if (s.multiplier !== 1) beats.push({ kind: "mult", side, value: s.multiplier });
   }
@@ -194,7 +196,7 @@ function RevealSequence({ result, me, names, instant, onImpact, footer }: Reveal
                   faceDown={!flipped}
                   index={i}
                   scoring={counted.has(c.id)}
-                  dimmed={labelShown && !isScoring}
+                  dimmed={labelShown && !isScoring && !counted.has(c.id)}
                   layoutId={side === me ? c.id : undefined}
                 />
                 {popup?.cardId === c.id && (

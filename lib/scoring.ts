@@ -8,22 +8,23 @@ export interface PlayScore {
   hand: HandType;
   /** Value of the combination itself. */
   base: number;
-  /** Cards forming the combination, each adding its chip value. */
+  /** Cards forming the combination (highlighted in the reveal). */
   scoring: Card[];
+  /** Every played card adds its point value, including extra cards outside the combination. */
   chips: number;
   bonuses: { jokerId: JokerId; amount: number }[];
   multiplier: number;
   total: number;
 }
 
-/** total = (combination value + scoring card values + joker bonuses) × joker multiplier */
+/** total = (combination value + points of every played card + joker bonuses) × joker multiplier */
 export function scorePlay(cards: Card[], jokers: JokerId[]): PlayScore | null {
   const result = evaluateHand(cards);
   if (!result) return null;
   const { type: hand, scoring } = result;
 
   const base = HAND_INFO[hand].value;
-  const chips = scoring.reduce((s, c) => s + chipValue(c.rank), 0);
+  const chips = cards.reduce((s, c) => s + chipValue(c.rank), 0);
   const bonuses: PlayScore["bonuses"] = [];
   let multiplier = 1;
   for (const id of jokers) {

@@ -4,7 +4,7 @@ import { scorePlay } from "@/lib/scoring";
 import CardArt from "./CardArt";
 
 const EXAMPLES: Record<HandType, { cards: Card[]; how: string }> = {
-  high_card: { cards: [card(13, "S")], how: "Ga ada yang cocok. Cuma kartu tertinggi yang dihitung." },
+  high_card: { cards: [card(13, "S")], how: "Ga ada kartu yang cocok. Kartu tertinggi jadi kombinasinya." },
   pair: { cards: [card(7, "H"), card(7, "C")], how: "2 kartu angka sama." },
   two_pair: { cards: [card(7, "H"), card(7, "C"), card(11, "D"), card(11, "S")], how: "2 pasang angka sama." },
   three_kind: { cards: [card(12, "S"), card(12, "H"), card(12, "D")], how: "3 kartu angka sama." },
@@ -20,7 +20,7 @@ export default function ComboGuide({ compact }: { compact?: boolean }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink/70 sm:text-base">
-        Skor = nilai kombinasi + nilai kartu yang membentuknya. Kartu 2–9 sesuai angka, 10/J/Q/K bernilai 10, As bernilai 11.
+        Skor = nilai kombinasi + nilai semua kartu yang kamu mainkan, termasuk kartu tambahan di luar kombinasi. Kartu 2–9 sesuai angka, 10/J/Q/K bernilai 10, As bernilai 11. Jadi isi sampai 5 kartu biar skornya maksimal.
       </p>
       <ol className={`grid gap-2 ${compact ? "" : "md:grid-cols-2"}`}>
         {HAND_TYPES.map((h, i) => {

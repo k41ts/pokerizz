@@ -10,8 +10,8 @@ npm test        # unit test logika game
 
 ## Skor
 
-Skor = nilai kombinasi + nilai kartu yang membentuk kombinasi itu (kartu sampingan ga dihitung).
-Kartu 2–9 sesuai angkanya, 10/J/Q/K = 10, As = 11. Contoh: 10 10 K K = 40 + Two Pair 30 = 70.
+Skor = nilai kombinasi + nilai semua kartu yang dimainkan (kartu tambahan di luar kombinasi ikut dihitung).
+Kartu 2–9 sesuai angkanya, 10/J/Q/K = 10, As = 11. Contoh: 8 8 J J = 36 + Two Pair 30 = 66; tambah K jadi 76.
 
 ## Main online
 

@@ -4,8 +4,8 @@ import type { JokerId } from "./jokers";
 import { scorePlay, type PlayScore } from "./scoring";
 import { JOKER_SLOTS, MAX_SELECT } from "./game";
 
-/** Bot keeps discarding while its best play scores below this. */
-const GOOD_ENOUGH = 45;
+/** Bot keeps discarding while its best combination is worth less than this (Two Pair = 30). */
+const GOOD_ENOUGH = 30;
 
 function* subsets(cards: Card[], maxSize: number): Generator<Card[]> {
   const n = cards.length;
@@ -36,7 +36,7 @@ export function chooseBestPlay(hand: Card[], jokers: JokerId[]): { cards: Card[]
 export function chooseDiscard(hand: Card[], jokers: JokerId[], discardsLeft: number): Card[] | null {
   if (discardsLeft <= 0) return null;
   const best = chooseBestPlay(hand, jokers);
-  if (best.score.total >= GOOD_ENOUGH) return null;
+  if (best.score.base >= GOOD_ENOUGH) return null;
 
   // Keep the best combo plus the most common suit if it's a flush draw.
   const suitCount = new Map<Suit, number>();
