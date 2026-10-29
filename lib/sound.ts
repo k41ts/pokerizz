@@ -69,7 +69,7 @@ function audio(): AudioContext | null {
     if (!Ctor) return null;
     ctx = new Ctor();
     master = ctx.createGain();
-    master.gain.value = 0.5;
+    master.gain.value = 0.75;
     const comp = ctx.createDynamicsCompressor();
     master.connect(comp).connect(ctx.destination);
     // A short feedback delay some skins send their sounds through.
@@ -175,19 +175,26 @@ const PENTA = [587.33, 698.46, 783.99, 880, 1046.5, 1174.66, 1396.91, 1567.98, 1
 /** Natural minor, for Void. */
 const MINOR = [0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17];
 
-const pluck = (ac: AudioContext, f: number, start = 0, vol = 0.14) => {
+const pluck = (ac: AudioContext, f: number, start = 0, vol = 0.18) => {
   tone(ac, { freq: f, type: "triangle", dur: 0.55, vol, attack: 0.003, start });
   tone(ac, { freq: f * 2, type: "sine", dur: 0.25, vol: vol * 0.35, attack: 0.003, start });
 };
-const clink = (ac: AudioContext, f: number, start = 0, vol = 0.1) => {
+const clink = (ac: AudioContext, f: number, start = 0, vol = 0.15) => {
   tone(ac, { freq: f, type: "sine", dur: 0.35, vol, attack: 0.002, start });
   tone(ac, { freq: f * 2.76, type: "sine", dur: 0.18, vol: vol * 0.5, attack: 0.002, start });
 };
-const saw = (ac: AudioContext, f: number, dur: number, vol: number, start = 0, low = 2400) => {
-  tone(ac, { freq: f, type: "sawtooth", dur, vol, start, low, lowTo: 500, detune: -8 });
-  tone(ac, { freq: f, type: "sawtooth", dur, vol, start, low, lowTo: 500, detune: 8 });
+const saw = (ac: AudioContext, f: number, dur: number, vol: number, start = 0, low = 5000) => {
+  tone(ac, { freq: f, type: "sawtooth", dur, vol, start, low, lowTo: 1400, detune: -9 });
+  tone(ac, { freq: f, type: "sawtooth", dur, vol, start, low, lowTo: 1400, detune: 9 });
 };
-const chip8 = (ac: AudioContext, f: number, start = 0, dur = 0.07, vol = 0.07) =>
+/** Metal gong: inharmonic partials that ring out. Audible on phone speakers. */
+const gong = (ac: AudioContext, f: number, start = 0, vol = 0.2) => {
+  tone(ac, { freq: f * 2, type: "sine", dur: 1.4, vol, start, attack: 0.004, wet: true });
+  tone(ac, { freq: f * 4.8, type: "sine", dur: 0.9, vol: vol * 0.6, start, attack: 0.004, wet: true });
+  tone(ac, { freq: f * 7.8, type: "sine", dur: 0.5, vol: vol * 0.35, start, attack: 0.004 });
+  tone(ac, { freq: f, type: "triangle", dur: 1.2, vol: vol * 0.8, start, attack: 0.004 });
+};
+const chip8 = (ac: AudioContext, f: number, start = 0, dur = 0.07, vol = 0.11) =>
   tone(ac, { freq: f, type: "square", dur, vol, start, attack: 0.001 });
 
 const VOICES: Record<SkinId, Voice> = {
@@ -223,8 +230,8 @@ const VOICES: Record<SkinId, Voice> = {
     },
   },
   sakura: {
-    select: (ac) => pluck(ac, 1567.98, 0, 0.1),
-    deselect: (ac) => pluck(ac, 1174.66, 0, 0.08),
+    select: (ac) => pluck(ac, 1567.98, 0, 0.15),
+    deselect: (ac) => pluck(ac, 1174.66, 0, 0.12),
     deal: (ac) => noise(ac, { dur: 0.12, vol: 0.08, freq: 3000, q: 0.5 }),
     discard: (ac) => noise(ac, { dur: 0.35, vol: 0.12, freq: 2500, to: 600, q: 0.4 }),
     play: (ac) => {
@@ -245,31 +252,46 @@ const VOICES: Record<SkinId, Voice> = {
     },
   },
   neon: {
-    select: (ac) => tone(ac, { freq: 600, to: 1800, type: "sawtooth", dur: 0.08, vol: 0.08, low: 4000 }),
-    deselect: (ac) => tone(ac, { freq: 1800, to: 600, type: "sawtooth", dur: 0.08, vol: 0.07, low: 4000 }),
-    deal: (ac) => tone(ac, { freq: 3000, to: 1500, type: "sine", dur: 0.04, vol: 0.05 }),
-    discard: (ac) => tone(ac, { freq: 1200, to: 120, type: "sawtooth", dur: 0.25, vol: 0.1, low: 3000, lowTo: 300 }),
+    select: (ac) => {
+      tone(ac, { freq: 700, to: 2100, type: "square", dur: 0.07, vol: 0.12 });
+      tone(ac, { freq: 2100, type: "sine", dur: 0.06, vol: 0.08, start: 0.05 });
+    },
+    deselect: (ac) => tone(ac, { freq: 2100, to: 700, type: "square", dur: 0.07, vol: 0.1 }),
+    deal: (ac) => tone(ac, { freq: 3200, to: 1600, type: "square", dur: 0.03, vol: 0.06 }),
+    discard: (ac) => tone(ac, { freq: 1600, to: 200, type: "sawtooth", dur: 0.25, vol: 0.16, low: 6000, lowTo: 600 }),
     play: (ac) => {
-      tone(ac, { freq: 220, to: 55, type: "sawtooth", dur: 0.4, vol: 0.28, low: 1400, lowTo: 200 });
-      noise(ac, { dur: 0.2, vol: 0.2, filter: "lowpass", freq: 2000, to: 200 });
+      tone(ac, { freq: 1800, to: 300, type: "square", dur: 0.15, vol: 0.14 });
+      tone(ac, { freq: 220, to: 55, type: "sawtooth", dur: 0.35, vol: 0.3, low: 2500, lowTo: 400 });
+      noise(ac, { dur: 0.12, vol: 0.28, filter: "highpass", freq: 3000 });
     },
-    flip: (ac) => tone(ac, { freq: 2400, to: 1200, type: "square", dur: 0.05, vol: 0.05 }),
-    chip: (ac, step) => saw(ac, note(440, Math.min(step, 14) + 12), 0.14, 0.05),
-    stamp: (ac) => saw(ac, 110, 0.18, 0.1, 0, 900),
+    flip: (ac) => tone(ac, { freq: 2600, to: 1300, type: "square", dur: 0.05, vol: 0.09 }),
+    chip: (ac, step) => {
+      const f = note(440, Math.min(step, 14) + 12);
+      saw(ac, f, 0.16, 0.1);
+      tone(ac, { freq: f, type: "square", dur: 0.08, vol: 0.05 });
+    },
+    stamp: (ac) => {
+      saw(ac, 220, 0.18, 0.16, 0, 3000);
+      noise(ac, { dur: 0.1, vol: 0.22, freq: 1500, q: 1 });
+    },
     combo: (ac, step) => {
-      [0, 4, 7, 11].forEach((s) => saw(ac, note(261.63, s + (step >= 5 ? 12 : 0)), 0.6, 0.05, 0, 3200));
-      if (step >= 5) tone(ac, { freq: 65, type: "sawtooth", dur: 0.6, vol: 0.2, low: 400 });
+      [0, 4, 7, 11].forEach((s) => saw(ac, note(523.25, s + (step >= 5 ? 12 : 0)), 0.55, 0.09));
+      [0, 4, 7, 12, 16].slice(0, 2 + Math.ceil(step * 0.4)).forEach((s, i) =>
+        tone(ac, { freq: note(1046.5, s), type: "square", dur: 0.08, vol: 0.06, start: 0.1 + i * 0.06 }),
+      );
+      if (step >= 5) tone(ac, { freq: 110, to: 55, type: "sawtooth", dur: 0.6, vol: 0.25, low: 1200 });
     },
-    joker: (ac) => [0, 7, 12, 19].forEach((s, i) => saw(ac, note(523.25, s), 0.2, 0.04, i * 0.05)),
+    joker: (ac) => [0, 7, 12, 19].forEach((s, i) => saw(ac, note(523.25, s), 0.2, 0.08, i * 0.05)),
     win: (ac) => {
-      [0, 4, 7, 12, 7, 4, 7, 12].forEach((s, i) => saw(ac, note(261.63, s + 12), 0.14, 0.045, i * 0.1));
-      [0, 4, 7].forEach((s) => saw(ac, note(130.81, s), 1.4, 0.05, 0.8, 1800));
+      [0, 4, 7, 12, 7, 4, 7, 12, 16].forEach((s, i) => saw(ac, note(523.25, s), 0.14, 0.09, i * 0.1));
+      [0, 4, 7].forEach((s) => saw(ac, note(261.63, s), 1.4, 0.08, 0.9, 3000));
+      noise(ac, { dur: 0.15, vol: 0.25, filter: "highpass", freq: 3000, start: 0.9 });
     },
   },
   gold: {
-    select: (ac) => clink(ac, 2093, 0, 0.08),
-    deselect: (ac) => clink(ac, 1568, 0, 0.06),
-    deal: (ac) => clink(ac, 3136, 0, 0.035),
+    select: (ac) => clink(ac, 2093, 0, 0.13),
+    deselect: (ac) => clink(ac, 1568, 0, 0.1),
+    deal: (ac) => clink(ac, 3136, 0, 0.06),
     discard: (ac) => [2637, 2093, 1568].forEach((f, i) => clink(ac, f, i * 0.05, 0.05)),
     play: (ac) => {
       for (let i = 0; i < 7; i++) clink(ac, 2000 + Math.random() * 2000, i * 0.035, 0.05);
@@ -289,29 +311,48 @@ const VOICES: Record<SkinId, Voice> = {
     },
   },
   void: {
-    select: (ac) => tone(ac, { freq: 220, to: 180, type: "sine", dur: 0.14, vol: 0.2, wet: true }),
-    deselect: (ac) => tone(ac, { freq: 165, type: "sine", dur: 0.1, vol: 0.15 }),
-    deal: (ac) => noise(ac, { dur: 0.08, vol: 0.18, filter: "lowpass", freq: 500 }),
-    discard: (ac) => noise(ac, { dur: 0.4, vol: 0.2, filter: "lowpass", freq: 1200, swell: true }),
-    play: (ac) => {
-      noise(ac, { dur: 0.35, vol: 0.25, filter: "lowpass", freq: 1500, swell: true });
-      tone(ac, { freq: 70, to: 32, type: "sine", dur: 0.8, vol: 0.6, start: 0.33, wet: true });
+    select: (ac) => {
+      tone(ac, { freq: 330, to: 262, type: "triangle", dur: 0.14, vol: 0.2, wet: true });
+      tone(ac, { freq: 660, type: "sine", dur: 0.08, vol: 0.06 });
     },
-    flip: (ac) => tone(ac, { freq: 330, to: 220, type: "sine", dur: 0.09, vol: 0.12, wet: true }),
-    chip: (ac, step) =>
-      tone(ac, { freq: note(220, MINOR[Math.min(step, MINOR.length - 1)]), type: "sine", dur: 0.25, vol: 0.16, wet: true }),
-    stamp: (ac) => tone(ac, { freq: 55, type: "sine", dur: 0.45, vol: 0.5, wet: true }),
+    deselect: (ac) => tone(ac, { freq: 247, type: "triangle", dur: 0.1, vol: 0.16 }),
+    deal: (ac) => noise(ac, { dur: 0.06, vol: 0.2, freq: 900, q: 2 }),
+    discard: (ac) => {
+      noise(ac, { dur: 0.4, vol: 0.24, filter: "highpass", freq: 2500, swell: true });
+      tone(ac, { freq: 220, to: 110, type: "triangle", dur: 0.3, vol: 0.14, start: 0.3 });
+    },
+    play: (ac) => {
+      // A reversed hiss sucked in, then the hit lands with a ringing gong.
+      noise(ac, { dur: 0.35, vol: 0.32, freq: 1200, to: 3200, q: 0.7, swell: true });
+      gong(ac, 110, 0.33, 0.24);
+      tone(ac, { freq: 140, to: 45, type: "sine", dur: 0.6, vol: 0.5, start: 0.33 });
+      noise(ac, { dur: 0.3, vol: 0.35, filter: "lowpass", freq: 900, start: 0.33 });
+    },
+    flip: (ac) => tone(ac, { freq: 440, to: 330, type: "triangle", dur: 0.09, vol: 0.15, wet: true }),
+    chip: (ac, step) => {
+      const f = note(440, MINOR[Math.min(step, MINOR.length - 1)]);
+      tone(ac, { freq: f, type: "triangle", dur: 0.3, vol: 0.17, wet: true });
+      tone(ac, { freq: f * 2, type: "sine", dur: 0.15, vol: 0.06 });
+    },
+    stamp: (ac) => {
+      gong(ac, 98, 0, 0.2);
+      noise(ac, { dur: 0.12, vol: 0.3, filter: "lowpass", freq: 700 });
+    },
     combo: (ac, step) => {
       MINOR.slice(0, 3 + step).forEach((s, i) =>
-        tone(ac, { freq: note(220, s), type: "triangle", dur: 0.3, vol: 0.1, start: i * 0.08, wet: true }),
+        tone(ac, { freq: note(440, s), type: "triangle", dur: 0.32, vol: 0.15, start: i * 0.08, wet: true }),
       );
-      if (step >= 5) tone(ac, { freq: 41, type: "sine", dur: 1, vol: 0.5, wet: true });
+      if (step >= 5) {
+        gong(ac, 73.4, 0, 0.3);
+        noise(ac, { dur: 0.5, vol: 0.25, filter: "highpass", freq: 3000, swell: true });
+      }
     },
     joker: (ac) =>
-      [0, 3, 7, 10].forEach((s, i) => tone(ac, { freq: note(440, s), type: "sine", dur: 0.4, vol: 0.08, start: i * 0.07, wet: true })),
+      [0, 3, 7, 10].forEach((s, i) => tone(ac, { freq: note(880, s), type: "sine", dur: 0.4, vol: 0.12, start: i * 0.07, wet: true })),
     win: (ac) => {
-      [0, 3, 7, 6].forEach((s, i) => tone(ac, { freq: note(220, s), type: "triangle", dur: 1.6, vol: 0.09, start: i * 0.25, wet: true }));
-      tone(ac, { freq: 55, type: "sine", dur: 2, vol: 0.35, start: 0.2, wet: true });
+      [0, 3, 7, 6].forEach((s, i) => tone(ac, { freq: note(440, s), type: "triangle", dur: 1.6, vol: 0.13, start: i * 0.25, wet: true }));
+      gong(ac, 110, 0.2, 0.26);
+      noise(ac, { dur: 0.9, vol: 0.2, filter: "highpass", freq: 4000, swell: true, start: 0.6 });
     },
   },
 };
