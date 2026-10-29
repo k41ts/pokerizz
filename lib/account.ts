@@ -9,7 +9,12 @@ export interface Profile {
   stars: number;
   wins: number;
   losses: number;
+  points: number;
+  skins: string[];
+  skin: string;
 }
+
+const PROFILE_COLUMNS = "id, username, stars, wins, losses, points, skins, skin";
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -64,7 +69,7 @@ export async function signOut() {
 }
 
 export async function fetchProfile(id: string): Promise<Profile | null> {
-  const { data } = (await supabase()?.from("profiles").select("id, username, stars, wins, losses").eq("id", id).maybeSingle()) ?? {};
+  const { data } = (await supabase()?.from("profiles").select(PROFILE_COLUMNS).eq("id", id).maybeSingle()) ?? {};
   return (data as Profile | null) ?? null;
 }
 
@@ -72,7 +77,7 @@ export async function fetchLeaderboard(limit = 10): Promise<Profile[]> {
   const { data } =
     (await supabase()
       ?.from("profiles")
-      .select("id, username, stars, wins, losses")
+      .select(PROFILE_COLUMNS)
       .gt("stars", 0)
       .order("stars", { ascending: false })
       .order("wins", { ascending: false })
@@ -84,6 +89,28 @@ export async function fetchLeaderboard(limit = 10): Promise<Profile[]> {
 export async function reportLoss(matchId: string, winnerId: string): Promise<boolean> {
   const { data, error } = (await supabase()?.rpc("report_loss", { p_match_id: matchId, p_winner_id: winnerId })) ?? {};
   return !error && data === true;
+}
+
+export async function buySkin(skin: string): Promise<boolean> {
+  const { data, error } = (await supabase()?.rpc("buy_skin", { p_skin: skin })) ?? {};
+  return !error && data === true;
+}
+
+export async function equipSkin(skin: string): Promise<boolean> {
+  const { data, error } = (await supabase()?.rpc("equip_skin", { p_skin: skin })) ?? {};
+  return !error && data === true;
+}
+
+/** Registers a ranked game against a matchmaking bot; null when it won't count. */
+export async function startBotMatch(level: number): Promise<string | null> {
+  const { data, error } = (await supabase()?.rpc("start_bot_match", { p_level: level })) ?? {};
+  return error ? null : ((data as string | null) ?? null);
+}
+
+/** The star change the server applied (+1, -1, 0), or null when the match didn't count. */
+export async function finishBotMatch(matchId: string, won: boolean): Promise<number | null> {
+  const { data, error } = (await supabase()?.rpc("finish_bot_match", { p_match_id: matchId, p_won: won })) ?? {};
+  return error || data === null || data === undefined ? null : Number(data);
 }
 
 export interface Tier {
@@ -99,6 +126,10 @@ const TIERS: Tier[] = [
   { name: "Emas", min: 30, next: 50 },
   { name: "Berlian", min: 50, next: null },
 ];
+
+export function tierIndex(stars: number): number {
+  return TIERS.findLastIndex((t) => stars >= t.min);
+}
 
 export function tierFor(stars: number): Tier {
   return [...TIERS].reverse().find((t) => stars >= t.min)!;

@@ -52,6 +52,115 @@ export function chooseDiscard(hand: Card[], jokers: JokerId[], discardsLeft: num
   return toss.length > 0 ? toss : null;
 }
 
+/**
+ * 0 Pemula … 4 Berlian. Higher levels never see hidden information: they only know
+ * which cards are left in their own deck, not in what order.
+ */
+export type BotLevel = 0 | 1 | 2 | 3 | 4;
+
+export type BotMove = { kind: "discard"; cards: Card[] } | { kind: "play"; cards: Card[] };
+
+const SAMPLES: Record<BotLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 24, 4: 48 };
+/** How much better (in expected points) a discard must look before the bot takes it. */
+const MARGIN: Record<BotLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 4, 4: 1 };
+
+function chips(c: Card) {
+  return c.rank === 14 ? 11 : Math.min(c.rank, 10);
+}
+
+/** Sets of cards worth holding on to: the current combo, a flush draw, a straight draw, pairs, high cards. */
+function keepCandidates(hand: Card[], best: Card[]): Card[][] {
+  const byValue = [...hand].sort((a, b) => chips(b) - chips(a) || b.rank - a.rank);
+  const candidates: Card[][] = [best];
+
+  const bySuit = new Map<Suit, Card[]>();
+  for (const c of hand) bySuit.set(c.suit, [...(bySuit.get(c.suit) ?? []), c]);
+  for (const group of bySuit.values()) if (group.length >= 3) candidates.push(group);
+
+  // Straight draws: one card per rank inside any 5-rank window (ace counts low too).
+  for (let low = 1; low <= 10; low++) {
+    const window: Card[] = [];
+    for (let r = low; r < low + 5; r++) {
+      const rank = r === 1 ? 14 : r;
+      const card = hand.find((c) => c.rank === rank);
+      if (card) window.push(card);
+    }
+    if (window.length >= 3) candidates.push(window);
+  }
+
+  const counts = new Map<number, number>();
+  for (const c of hand) counts.set(c.rank, (counts.get(c.rank) ?? 0) + 1);
+  const sets = hand.filter((c) => (counts.get(c.rank) ?? 0) >= 2);
+  if (sets.length > 0) candidates.push(sets);
+  candidates.push(byValue.slice(0, 3));
+
+  // A discard throws away 1–5 cards, so a keep set holds 3–7 of the 8.
+  return candidates.map((keep) => {
+    const ids = new Set(keep.map((c) => c.id));
+    const filled = [...keep];
+    for (const c of byValue) {
+      if (filled.length >= 3) break;
+      if (!ids.has(c.id)) filled.push(c);
+    }
+    return filled.slice(0, 7);
+  });
+}
+
+function sample<T>(pool: T[], n: number): T[] {
+  const copy = [...pool];
+  for (let i = 0; i < n && i < copy.length; i++) {
+    const j = i + Math.floor(Math.random() * (copy.length - i));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
+
+/** Average best score after keeping `keep` and drawing the rest from `pool`. */
+function expectedBest(keep: Card[], pool: Card[], handSize: number, jokers: JokerId[], samples: number): number {
+  const need = handSize - keep.length;
+  let total = 0;
+  for (let i = 0; i < samples; i++) total += chooseBestPlay([...keep, ...sample(pool, need)], jokers).score.total;
+  return total / samples;
+}
+
+/**
+ * One decision for a bot: discard (it will be asked again) or play.
+ * `pool` is the cards the bot could draw: its own deck, order unknown.
+ */
+export function botMove(hand: Card[], jokers: JokerId[], discardsLeft: number, pool: Card[], level: BotLevel): BotMove {
+  const best = chooseBestPlay(hand, jokers);
+
+  if (level === 0) {
+    // Beginners often miss their best hand.
+    if (Math.random() < 0.45) {
+      const n = 1 + Math.floor(Math.random() * 3);
+      return { kind: "play", cards: sample(hand, n) };
+    }
+    return { kind: "play", cards: best.cards };
+  }
+  if (level === 1 || discardsLeft <= 0) return { kind: "play", cards: best.cards };
+  if (level === 2) {
+    const toss = chooseDiscard(hand, jokers, discardsLeft);
+    return toss ? { kind: "discard", cards: toss } : { kind: "play", cards: best.cards };
+  }
+
+  if (pool.length === 0) return { kind: "play", cards: best.cards };
+  const baseline = best.score.total;
+  let bestKeep: Card[] | null = null;
+  let bestValue = baseline + MARGIN[level];
+  for (const keep of keepCandidates(hand, best.cards)) {
+    if (keep.length >= hand.length) continue;
+    const value = expectedBest(keep, pool, hand.length, jokers, SAMPLES[level]);
+    if (value > bestValue) {
+      bestValue = value;
+      bestKeep = keep;
+    }
+  }
+  if (!bestKeep) return { kind: "play", cards: best.cards };
+  const keepIds = new Set(bestKeep.map((c) => c.id));
+  return { kind: "discard", cards: hand.filter((c) => !keepIds.has(c.id)).slice(0, MAX_SELECT) };
+}
+
 const BASE_JOKER_VALUE: Record<JokerId, number> = {
   tameng: 3,
   vampir: 3,

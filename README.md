@@ -20,10 +20,20 @@ Semua pesan lewat server Supabase pakai websocket, jadi tetap jalan di data selu
 Host yang menjalankan game; device tamu cuma dikirimi kartunya sendiri, jadi kartu lawan ga bisa diintip sebelum dibuka.
 Main online butuh env Supabase di bawah.
 
-## Akun dan rank
+## Cari lawan (ranked)
 
-Akun pakai Supabase Auth (username + password). Tiap menang online lawan pemain yang juga login: +1 bintang.
-Hasil dicatat lewat fungsi `report_loss` yang dipanggil device pihak yang kalah, jadi pemain ga bisa nambah bintang sendiri. Pasangan yang sama maksimal 10 kemenangan tercatat per hari.
+Pemain yang lagi nyari masuk antrian Supabase Realtime. Yang paling lama nunggu jadi host dan dipasangin sama pemain berikutnya.
+Kalau dalam 8–12 detik ga ada orang, lawannya bot dengan nama acak, levelnya ngikutin rank pemain (Pemula sampai Berlian).
+Bot Emas dan Berlian milih buangan kartu dengan simulasi kemungkinan kartu yang bakal ditarik (ga ngintip deck).
+Tiap ronde ada waktu 10 detik; kalau habis, kartu yang dipilih otomatis dimainin (atau 1 kartu acak). Latihan lawan bot ga pakai timer.
+
+## Akun, rank, dan skin
+
+Akun pakai Supabase Auth (username + password).
+
+- Menang lawan pemain yang login: +1 bintang, +30 poin. Kalah: +10 poin. Dicatat lewat `report_loss` dari device yang kalah, maksimal 10 kemenangan per pasangan per hari.
+- Menang lawan bot di Cari lawan: +1 bintang, +30 poin. Kalah: −1 bintang (minimal 0), +10 poin. Match harus didaftarin dulu (`start_bot_match`), minimal 20 detik, sekali lapor, maksimal 30 per hari. Hasilnya dikirim dari device pemain, jadi ini cuma memperlambat kecurangan, bukan mencegah.
+- Poin buat beli skin kartu (`buy_skin`, harga ada di tabel `skin_prices`). Lawan lihat skin kartumu selama main.
 
 Setup:
 
@@ -48,5 +58,7 @@ Tanpa env ini, game tetap jalan, cuma tanpa akun dan rank.
 - `lib/bot.ts`: AI bot
 - `lib/net.ts`: room online (Supabase Realtime)
 - `lib/sound.ts`: efek suara, disintesis pakai Web Audio (tanpa file audio)
-- `lib/account.ts`: akun, profil, papan peringkat, rank (Supabase)
+- `lib/account.ts`: akun, profil, papan peringkat, rank, poin, skin (Supabase)
+- `lib/matchmaking.ts`: antrian Cari lawan dan bot pengganti
+- `lib/skins.ts`: daftar skin kartu
 - `components/`: tampilan; `CardArt.tsx` gambar kartu (SVG), `Arena.tsx` animasi reveal, `Tutorial.tsx`, `ComboGuide.tsx`

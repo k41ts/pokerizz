@@ -6,6 +6,7 @@ import type { Card } from "@/lib/cards";
 import type { GameState, PlayerIndex, RoundResult } from "@/lib/game";
 import { chipValue, HAND_INFO, HAND_TYPES } from "@/lib/hands";
 import { JOKERS } from "@/lib/jokers";
+import { SkinContext, skinById } from "@/lib/skins";
 import { play, type Sfx } from "@/lib/sound";
 import HandFx, { FX_HOLD } from "./HandFx";
 import PlayingCard from "./PlayingCard";
@@ -106,6 +107,7 @@ function sfxFor(beat: Beat, result: RoundResult): [Sfx, number][] {
 interface RevealProps {
   result: RoundResult;
   me: PlayerIndex;
+  skins: [string, string];
   names: [string, string];
   instant?: boolean;
   onImpact: () => void;
@@ -113,7 +115,7 @@ interface RevealProps {
 }
 
 /** Plays the round out beat by beat: flip, count each scoring card, add jokers, then clash. */
-function RevealSequence({ result, me, names, instant, onImpact, footer }: RevealProps) {
+function RevealSequence({ result, me, skins, names, instant, onImpact, footer }: RevealProps) {
   const them: PlayerIndex = me === 0 ? 1 : 0;
   const beats = useMemo(() => buildBeats(result, [them, me]), [result, them, me]);
   const [beat, setBeat] = useState(instant ? beats.length - 1 : -1);
@@ -187,6 +189,7 @@ function RevealSequence({ result, me, names, instant, onImpact, footer }: Reveal
         : null;
 
     return (
+      <SkinContext.Provider value={skinById(skins[side])}>
       <div className={`flex flex-col items-center gap-3 transition-opacity duration-300 ${lost ? "opacity-55" : ""}`}>
         <div className="flex w-full items-center justify-between gap-2">
           <span className="text-sm text-paper/60">{side === me ? "Kamu" : names[side]}</span>
@@ -237,6 +240,7 @@ function RevealSequence({ result, me, names, instant, onImpact, footer }: Reveal
           )}
         </div>
       </div>
+      </SkinContext.Provider>
     );
   }
 
@@ -296,11 +300,12 @@ function RevealSequence({ result, me, names, instant, onImpact, footer }: Reveal
 interface ArenaProps {
   view: GameState;
   me: PlayerIndex;
+  skins: [string, string];
   onImpact: () => void;
   onContinue: () => void;
 }
 
-export default function Arena({ view, me, onImpact, onContinue }: ArenaProps) {
+export default function Arena({ view, me, skins, onImpact, onContinue }: ArenaProps) {
   const them: PlayerIndex = me === 0 ? 1 : 0;
   const { phase, players } = view;
   const names: [string, string] = [players[0].name, players[1].name];
@@ -338,7 +343,9 @@ export default function Arena({ view, me, onImpact, onContinue }: ArenaProps) {
         <div className="relative flex flex-col gap-3 sm:gap-5">
           {players[them].played ? (
             <div className="flex flex-col items-center gap-2">
-              <Row cards={players[them].played!} faceDown />
+              <SkinContext.Provider value={skinById(skins[them])}>
+                <Row cards={players[them].played!} faceDown />
+              </SkinContext.Provider>
               <p className="text-sm text-paper/60">Lawan udah kunci {players[them].played!.length} kartu</p>
             </div>
           ) : (
@@ -347,7 +354,9 @@ export default function Arena({ view, me, onImpact, onContinue }: ArenaProps) {
           <div className="h-px bg-paper/15" />
           {players[me].played ? (
             <div className="flex flex-col items-center gap-2">
-              <Row cards={players[me].played!} layout />
+              <SkinContext.Provider value={skinById(skins[me])}>
+                <Row cards={players[me].played!} layout />
+              </SkinContext.Provider>
               <p className="flex items-center gap-2 text-sm text-paper/60">
                 <span className="animate-pulse-dot size-1.5 rounded-full bg-signal" /> Kartumu terkunci. Nunggu lawan…
               </p>
@@ -363,6 +372,7 @@ export default function Arena({ view, me, onImpact, onContinue }: ArenaProps) {
           key={view.round}
           result={phase.result}
           me={me}
+          skins={skins}
           names={names}
           instant={phase.kind === "gameOver"}
           onImpact={impact}

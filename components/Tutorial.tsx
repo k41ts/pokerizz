@@ -184,7 +184,7 @@ const SLIDES = [
   },
   {
     title: "Pilih kartu",
-    body: "Tiap ronde kamu pegang 8 kartu. Ketuk 1–5 kartu buat bikin kombinasi poker. Bingung? Tekan \"Pilihin\" dan game milih kombinasi terbaik buatmu.",
+    body: "Tiap ronde kamu pegang 8 kartu. Ketuk 1–5 kartu buat bikin kombinasi poker. Kenali sendiri kombinasimu, ga ada yang ngasih tahu. Di Cari lawan cuma ada 10 detik tiap ronde.",
     Demo: PickDemo,
   },
   {
@@ -204,7 +204,7 @@ const SLIDES = [
   },
   {
     title: "Joker dan bintang",
-    body: "Tiap 3 ronde pilih satu Joker buat bonus. Menang online pakai akun dapat +1 bintang buat naik rank.",
+    body: "Tiap 3 ronde pilih satu Joker buat bonus. Di Cari lawan, menang +1 bintang dan kalah −1. Poin dari tiap match bisa buat buka skin kartu.",
     Demo: JokerDemo,
   },
 ];

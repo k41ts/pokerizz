@@ -6,9 +6,9 @@ import type { GameAction, GameState } from "./game";
 
 /** Messages between the two browsers. The host runs the game; the guest only sends actions. */
 export type NetMessage =
-  | { t: "hello"; name: string; userId: string | null }
+  | { t: "hello"; name: string; userId: string | null; skin: string }
   /** Sent by the host for every new game: who is signed in, and the id the result is recorded under. */
-  | { t: "meta"; matchId: string; userIds: [string | null, string | null] }
+  | { t: "meta"; matchId: string; userIds: [string | null, string | null]; skins: [string, string] }
   | { t: "state"; state: GameState }
   | { t: "action"; action: GameAction }
   | { t: "rematch" }
@@ -50,6 +50,22 @@ export interface Link {
   /** The other player's connection dropped (true) or came back (false). */
   onPresence(fn: (gone: boolean) => void): () => void;
   close(): void;
+}
+
+/** A room both players are in, from the lobby or from matchmaking. */
+export type Connected =
+  | { role: "host"; link: Link; names: [string, string]; userIds: [string | null, string | null]; skins: [string, string] }
+  | { role: "guest"; link: Link };
+
+/** The host side of a room once the guest has said hello. */
+export function hostConnected(link: Link, me: { name: string; userId: string | null; skin: string }, hello: Extract<NetMessage, { t: "hello" }>): Connected {
+  return {
+    role: "host",
+    link,
+    names: [me.name, hello.name || "Teman"],
+    userIds: [me.userId, hello.userId],
+    skins: [me.skin, hello.skin || "classic"],
+  };
 }
 
 export class RoomError extends Error {

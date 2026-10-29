@@ -1,18 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { chooseBestPlay, chooseDiscard, chooseJoker } from "@/lib/bot";
-import { reportLoss } from "@/lib/account";
+import { finishBotMatch, reportLoss, startBotMatch } from "@/lib/account";
+import { botMove, chooseJoker, type BotLevel } from "@/lib/bot";
 import { createGame, gameReducer, viewFor, type GameAction, type GameState, type PlayerIndex } from "@/lib/game";
 import { send, type Link } from "@/lib/net";
 import { play } from "@/lib/sound";
-import Game, { type LocalAction, type RankNote } from "./Game";
+import Game, { TURN_SECONDS, type LocalAction, type RankNote } from "./Game";
 import { PrimaryButton } from "./ui";
 
-const BOT_DELAY = 900;
+const TRAINING_DELAY = 900;
+/** Extra time the host allows the guest before playing a card for them. */
+const GUEST_GRACE = 4;
 
 function newSeed() {
   return Math.floor(Math.random() * 2 ** 32);
+}
+
+function between(min: number, max: number) {
+  return min + Math.random() * (max - min);
 }
 
 type Reset = { type: "reset"; state: GameState };
@@ -20,37 +26,108 @@ function hostReducer(state: GameState, action: GameAction | Reset): GameState {
   return action.type === "reset" ? action.state : gameReducer(state, action);
 }
 
-/** Single player: the bot is player 2 and acts on its own timer. */
-export function BotMatch({ name, onExit }: { name: string; onExit: () => void }) {
-  const [state, dispatch] = useReducer(hostReducer, undefined, () => createGame("bot", newSeed(), [name, "Bot"]));
+export type BotOpponent =
+  | { kind: "training" }
+  /** From matchmaking: looks like any player, plays at the level of the player's rank. */
+  | { kind: "ranked"; name: string; skin: string; level: BotLevel; signedIn: boolean };
+
+/** One game against a bot. Training is relaxed; ranked has a timer and counts for stars. */
+export function BotMatch({
+  name,
+  skin,
+  opponent,
+  onExit,
+  onSearchAgain,
+  onRanked,
+}: {
+  name: string;
+  skin: string;
+  opponent: BotOpponent;
+  onExit: () => void;
+  onSearchAgain?: () => void;
+  onRanked?: () => void;
+}) {
+  const ranked = opponent.kind === "ranked";
+  const level: BotLevel = ranked ? opponent.level : 2;
+  const names: [string, string] = [name, ranked ? opponent.name : "Bot"];
+  const newGame = useCallback(() => {
+    const g = createGame("bot", newSeed(), names);
+    // A matchmaking bot is shown like any other player.
+    if (ranked) g.players[1] = { ...g.players[1], isBot: false };
+    return g;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- names only change with a new match
+  }, [ranked, names[0], names[1]]);
+  const [state, dispatch] = useReducer(hostReducer, undefined, newGame);
   const { phase, players } = state;
   const bot = players[1];
 
   useEffect(() => {
     let act: (() => void) | null = null;
+    let delay = TRAINING_DELAY;
     if (phase.kind === "turn" && !bot.played) {
-      act = () => {
-        const toss = chooseDiscard(bot.hand, bot.jokers, bot.discardsLeft);
-        if (toss) dispatch({ type: "discard", player: 1, cardIds: toss.map((c) => c.id) });
-        else dispatch({ type: "play", player: 1, cardIds: chooseBestPlay(bot.hand, bot.jokers).cards.map((c) => c.id) });
-      };
+      const move = botMove(bot.hand, bot.jokers, bot.discardsLeft, bot.deck, level);
+      // Ranked bots take human-like time, always inside the turn timer.
+      if (ranked) delay = move.kind === "discard" ? between(1500, 3000) : between(2500, 6500);
+      act = () => dispatch({ type: move.kind, player: 1, cardIds: move.cards.map((c) => c.id) });
     } else if (phase.kind === "reveal" && !phase.ready[1]) {
       dispatch({ type: "continue", player: 1 });
     } else if (phase.kind === "jokerPick" && !phase.done[1]) {
+      if (ranked) delay = between(1500, 4000);
       act = () => dispatch({ type: "pickJoker", player: 1, ...chooseJoker(phase.offers[1], bot.jokers, bot.history) });
     }
     if (!act) return;
-    const t = setTimeout(act, BOT_DELAY);
+    const t = setTimeout(act, delay);
     return () => clearTimeout(t);
-  }, [phase, bot]);
+  }, [phase, bot, level, ranked]);
+
+  // Ranked: register the match when it starts, report the result when it ends.
+  const matchId = useRef<Promise<string | null> | null>(null);
+  const [note, setNote] = useState<RankNote | null>(null);
+  const signedIn = ranked && opponent.signedIn;
+  // A ranked bot match is one game; "play again" searches for a new opponent.
+  useEffect(() => {
+    if (signedIn && !matchId.current) matchId.current = startBotMatch(level);
+  }, [signedIn, level]);
+
+  const winner = phase.kind === "gameOver" ? phase.winner : undefined;
+  useEffect(() => {
+    if (winner === undefined) return;
+    if (!ranked) return;
+    if (!signedIn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- result text for this game
+      setNote({ kind: "unranked", text: "Masuk akun biar menang dapat bintang dan poin." });
+      return;
+    }
+    const pending = matchId.current;
+    matchId.current = null;
+    if (winner === null || !pending) {
+      setNote({ kind: "unranked", text: "Seri, ga ada bintang." });
+      return;
+    }
+    void pending.then(async (id) => {
+      const delta = id ? await finishBotMatch(id, winner === 0) : null;
+      if (delta === null) setNote({ kind: "unranked", text: "Game ini ga dihitung (terlalu singkat atau batas harian)." });
+      else if (winner === 0) setNote({ kind: "star", text: "+1 bintang · +30 poin" });
+      else setNote({ kind: "loss", text: delta < 0 ? "−1 bintang · +10 poin" : "+10 poin" });
+      onRanked?.();
+    });
+  }, [winner, ranked, signedIn, onRanked]);
 
   return (
     <Game
       view={viewFor(state, 0)}
       me={0}
       act={(a) => dispatch({ ...a, player: 0 } as GameAction)}
-      onRestart={() => dispatch({ type: "reset", state: createGame("bot", newSeed(), [name, "Bot"]) })}
+      onRestart={() => {
+        if (ranked && onSearchAgain) return onSearchAgain();
+        setNote(null);
+        dispatch({ type: "reset", state: newGame() });
+      }}
+      restartLabel={ranked ? "Cari lawan lagi" : "Main lagi"}
       onExit={onExit}
+      rankNote={note}
+      skins={[skin, ranked ? opponent.skin : "classic"]}
+      turnSeconds={ranked ? TURN_SECONDS : undefined}
     />
   );
 }
@@ -58,6 +135,7 @@ export function BotMatch({ name, onExit }: { name: string; onExit: () => void })
 interface Meta {
   matchId: string;
   userIds: [string | null, string | null];
+  skins: [string, string];
 }
 
 /**
@@ -84,9 +162,9 @@ function useRankNote(view: GameState | null, me: PlayerIndex, meta: Meta | null,
   }, [winner, meta, ranked, me, onRanked]);
 
   if (winner === undefined) return null;
-  if (!ranked) return { kind: "unranked", text: "Main pakai akun berdua biar menang dapat bintang." };
+  if (!ranked) return { kind: "unranked", text: "Main pakai akun berdua biar menang dapat bintang dan poin." };
   if (winner === null) return { kind: "unranked", text: "Seri, ga ada bintang." };
-  return winner === me ? { kind: "star", text: "+1 bintang buat rank-mu" } : { kind: "loss", text: "Kekalahan dicatat di akunmu." };
+  return winner === me ? { kind: "star", text: "+1 bintang · +30 poin" } : { kind: "loss", text: "Kekalahan dicatat · +10 poin" };
 }
 
 function newMatchId() {
@@ -101,10 +179,10 @@ function LinkBanner({ status, onExit }: { status: LinkStatus; onExit: () => void
       <div>
         <p className="flex items-center gap-2 font-semibold">
           {!gone && <span className="animate-pulse-dot size-2 rounded-full bg-signal" />}
-          {gone ? "Temanmu keluar dari game" : "Temanmu lagi ga nyambung"}
+          {gone ? "Lawanmu keluar dari game" : "Lawanmu lagi ga nyambung"}
         </p>
         <p className="text-sm text-paper/60">
-          {gone ? "Bikin room baru buat main lagi." : "Game lanjut otomatis kalau dia balik. Atau keluar ke menu."}
+          {gone ? "Cari lawan atau bikin room baru buat main lagi." : "Game lanjut otomatis kalau dia balik. Atau keluar ke menu."}
         </p>
       </div>
       <PrimaryButton tone="red" onClick={onExit}>
@@ -168,12 +246,14 @@ export function HostMatch({
   link,
   names,
   userIds,
+  skins,
   onExit,
   onRanked,
 }: {
   link: Link;
   names: [string, string];
   userIds: [string | null, string | null];
+  skins: [string, string];
   onExit: () => void;
   onRanked: () => void;
 }) {
@@ -184,12 +264,12 @@ export function HostMatch({
     dispatch({ type: "reset", state: createGame("online", newSeed(), names) });
     setMatchId(newMatchId());
   }, [names]);
-  const meta = { matchId, userIds };
+  const meta = { matchId, userIds, skins };
   const rankNote = useRankNote(state, 0, meta, onRanked);
 
   useEffect(() => {
-    send(link, { t: "meta", matchId, userIds });
-  }, [link, matchId, userIds]);
+    send(link, { t: "meta", matchId, userIds, skins });
+  }, [link, matchId, userIds, skins]);
 
   // Latest values for resending when the guest asks for a sync.
   const latest = useRef({ state, matchId });
@@ -199,7 +279,7 @@ export function HostMatch({
 
   useEffect(() => {
     const resync = () => {
-      send(link, { t: "meta", matchId: latest.current.matchId, userIds });
+      send(link, { t: "meta", matchId: latest.current.matchId, userIds, skins });
       send(link, { t: "state", state: viewFor(latest.current.state, 1) });
     };
     const offMessage = link.onMessage((msg) => {
@@ -214,11 +294,25 @@ export function HostMatch({
       offMessage();
       offPresence();
     };
-  }, [link, restart, userIds]);
+  }, [link, restart, userIds, skins]);
 
   useEffect(() => {
     send(link, { t: "state", state: viewFor(state, 1) });
   }, [link, state]);
+
+  // The guest's own timer plays for them; this backs it up if their device stalls.
+  const guestWaiting = state.phase.kind === "turn" && !state.players[1].played;
+  const guestHand = state.players[1].hand;
+  useEffect(() => {
+    if (!guestWaiting) return;
+    const t = setTimeout(() => {
+      const card = guestHand[Math.floor(Math.random() * guestHand.length)];
+      if (card) dispatch({ type: "play", player: 1, cardIds: [card.id] });
+    }, (TURN_SECONDS + 1 + GUEST_GRACE) * 1000);
+    return () => clearTimeout(t);
+    // Restart only when a new turn begins, not on every discard.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guestWaiting, state.round]);
 
   return (
     <>
@@ -229,6 +323,8 @@ export function HostMatch({
         onRestart={restart}
         onExit={onExit}
         rankNote={rankNote}
+        skins={skins}
+        turnSeconds={TURN_SECONDS}
       />
       <LinkBanner status={status} onExit={onExit} />
     </>
@@ -252,7 +348,7 @@ export function GuestMatch({ link, onExit, onRanked }: { link: Link; onExit: () 
         }
         setView(msg.state);
       }
-      if (msg.t === "meta") setMeta({ matchId: msg.matchId, userIds: msg.userIds });
+      if (msg.t === "meta") setMeta({ matchId: msg.matchId, userIds: msg.userIds, skins: msg.skins ?? ["classic", "classic"] });
     });
     send(link, { t: "sync" });
     // Ask again if the first answer got lost.
@@ -283,6 +379,8 @@ export function GuestMatch({ link, onExit, onRanked }: { link: Link; onExit: () 
         onRestart={() => send(link, { t: "rematch" })}
         onExit={onExit}
         rankNote={rankNote}
+        skins={meta?.skins ?? ["classic", "classic"]}
+        turnSeconds={TURN_SECONDS}
       />
       <LinkBanner status={status} onExit={onExit} />
     </>

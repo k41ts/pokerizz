@@ -19,8 +19,10 @@ interface Props {
   profile: Profile | null;
   accountsAvailable: boolean;
   newPlayer: boolean;
+  onMatchmaking: () => void;
   onOnline: () => void;
   onBot: () => void;
+  onSkins: () => void;
   onTutorial: () => void;
   onAccount: () => void;
 }
@@ -124,7 +126,19 @@ function Leaderboard({ me }: { me: Profile | null }) {
   );
 }
 
-export default function Menu({ name, onName, profile, accountsAvailable, newPlayer, onOnline, onBot, onTutorial, onAccount }: Props) {
+export default function Menu({
+  name,
+  onName,
+  profile,
+  accountsAvailable,
+  newPlayer,
+  onMatchmaking,
+  onOnline,
+  onBot,
+  onSkins,
+  onTutorial,
+  onAccount,
+}: Props) {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-3 sm:p-5">
       <header className="flex items-center justify-between gap-2 rounded-full bg-panel p-1.5">
@@ -158,8 +172,9 @@ export default function Menu({ name, onName, profile, accountsAvailable, newPlay
             {newPlayer && (
               <BigAction title="Tutorial" hint="Belajar main dalam 1 menit" tone="red" badge="Baru pertama main? Mulai di sini" onClick={onTutorial} />
             )}
-            <BigAction title="Lawan teman" hint="Online, beda HP atau laptop" tone={newPlayer ? "dark" : "red"} onClick={onOnline} />
-            <BigAction title="Lawan bot" hint="Latihan sendiri, ga perlu akun" tone={newPlayer ? "light" : "dark"} onClick={onBot} />
+            <BigAction title="Cari lawan" hint="Ranked, langsung dipasangin lawan" tone={newPlayer ? "dark" : "red"} onClick={onMatchmaking} />
+            <BigAction title="Main sama teman" hint="Bikin room, kirim link ke teman" tone="light" onClick={onOnline} />
+            <BigAction title="Latihan" hint="Lawan bot santai, tanpa timer" tone="light" onClick={onBot} />
             {!newPlayer && <BigAction title="Tutorial" hint="Ulang cara main" tone="light" onClick={onTutorial} />}
           </div>
           {!profile && (
@@ -192,15 +207,26 @@ export default function Menu({ name, onName, profile, accountsAvailable, newPlay
                   <span className="text-signal">★</span> {profile.stars}
                 </p>
                 <p className="text-base text-paper/70">
-                  {profile.wins} menang, {profile.losses} kalah. Menang online lawan pemain yang login: +1 bintang.
+                  {profile.wins} menang, {profile.losses} kalah. Di Cari lawan: menang +1 bintang, kalah −1.
                 </p>
+                <button
+                  type="button"
+                  onClick={onSkins}
+                  className="press flex items-center justify-between gap-3 rounded-2xl bg-paper/10 px-4 py-3 text-left ring-1 ring-paper/20 hover:bg-paper/15"
+                >
+                  <span>
+                    <span className="block font-semibold">Skin kartu</span>
+                    <span className="block text-sm text-paper/60">{profile.points} poin buat buka skin baru</span>
+                  </span>
+                  <span className="font-display text-sm">Buka</span>
+                </button>
               </>
             ) : (
               <>
                 <div>
                   <p className="font-display text-xl">Kumpulin bintang</p>
                   <p className="mt-2 text-base text-paper/70">
-                    Bikin akun, menang online lawan teman yang juga login, dapat +1 bintang. Naik dari Pemula sampai Berlian.
+                    Bikin akun, main Cari lawan, kumpulin bintang dan poin. Naik dari Pemula sampai Berlian, buka skin kartu buat dipamerin ke lawan.
                   </p>
                 </div>
                 <button

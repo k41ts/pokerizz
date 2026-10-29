@@ -5,9 +5,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import { JOKER_EVERY, type GameState, type PlayerIndex } from "@/lib/game";
 import type { JokerId } from "@/lib/jokers";
+import { SkinContext, skinById } from "@/lib/skins";
 import Arena from "./Arena";
-import ComboGuide from "./ComboGuide";
-import Sheet from "./Sheet";
 import GameOver from "./GameOver";
 import HandTray from "./HandTray";
 import JokerPicker from "./JokerPicker";
@@ -20,6 +19,9 @@ export type LocalAction =
   | { type: "play"; cardIds: string[] }
   | { type: "continue" }
   | { type: "pickJoker"; jokerId: JokerId | null; replaceIndex?: number };
+
+/** Seconds to pick cards in ranked and online games. The round banner gets one more. */
+export const TURN_SECONDS = 10;
 
 export interface RankNote {
   kind: "star" | "loss" | "unranked";
@@ -36,6 +38,10 @@ interface Props {
   restartLabel?: string;
   banner?: React.ReactNode;
   rankNote?: RankNote | null;
+  /** Card skin of each player, by player index. */
+  skins?: [string, string];
+  /** Turn timer; none in training. */
+  turnSeconds?: number;
 }
 
 /** A black strip sweeps across when a new round starts. */
@@ -72,9 +78,20 @@ function RoundBanner({ round }: { round: number }) {
   );
 }
 
-export default function Game({ view, me, act, onRestart, onExit, restartLabel = "Main lagi", banner, rankNote }: Props) {
-  const [guideOpen, setGuideOpen] = useState(false);
+export default function Game({
+  view,
+  me,
+  act,
+  onRestart,
+  onExit,
+  restartLabel = "Main lagi",
+  banner,
+  rankNote,
+  skins = ["classic", "classic"],
+  turnSeconds,
+}: Props) {
   const them: PlayerIndex = me === 0 ? 1 : 0;
+  const mySkin = skinById(skins[me]);
   const { phase, players, round } = view;
   // HP drops only when the reveal reaches the clash, not when the state arrives.
   const [impactRound, setImpactRound] = useState(0);
@@ -104,15 +121,6 @@ export default function Game({ view, me, act, onRestart, onExit, restartLabel = 
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setGuideOpen(true)}
-              aria-label="Daftar kombinasi"
-              className="press rounded-full bg-paper px-3 py-2 text-sm font-semibold ring-1 ring-ink/10 hover:bg-panel sm:px-3.5"
-            >
-              <span className="sm:hidden">Combo</span>
-              <span className="max-sm:hidden">Kombinasi</span>
-            </button>
             <SoundToggle />
             <button type="button" onClick={onExit} className="press rounded-full bg-ink px-3 py-2 text-sm font-semibold text-paper sm:px-4">
               Keluar
@@ -122,9 +130,6 @@ export default function Game({ view, me, act, onRestart, onExit, restartLabel = 
 
         {banner}
         {phase.kind === "turn" && <RoundBanner key={round} round={round} />}
-        <Sheet open={guideOpen} onClose={() => setGuideOpen(false)} title="Daftar kombinasi">
-          <ComboGuide />
-        </Sheet>
 
         <div className="grid gap-2 sm:gap-3 lg:grid-cols-[minmax(280px,340px)_1fr]">
           <div className="flex flex-col gap-3 max-lg:contents">
@@ -147,23 +152,27 @@ export default function Game({ view, me, act, onRestart, onExit, restartLabel = 
                   onPick={(jokerId, replaceIndex) => act({ type: "pickJoker", jokerId, replaceIndex })}
                 />
               ) : (
-                <Arena view={view} me={me} onImpact={onImpact} onContinue={() => act({ type: "continue" })} />
+                <Arena view={view} me={me} skins={skins} onImpact={onImpact} onContinue={() => act({ type: "continue" })} />
               )}
             </div>
             {phase.kind === "turn" && !players[me].played && (
               <div className="max-lg:order-4">
-                <HandTray
-                  key={round}
-                  player={players[me]}
-                  onDiscard={(cardIds) => act({ type: "discard", cardIds })}
-                  onPlay={(cardIds) => act({ type: "play", cardIds })}
-                />
+                <SkinContext.Provider value={mySkin}>
+                  <HandTray
+                    key={round}
+                    player={players[me]}
+                    turnSeconds={turnSeconds}
+                    onDiscard={(cardIds) => act({ type: "discard", cardIds })}
+                    onPlay={(cardIds) => act({ type: "play", cardIds })}
+                  />
+                </SkinContext.Provider>
               </div>
             )}
           </div>
         </div>
 
         {phase.kind === "gameOver" && (
+          <SkinContext.Provider value={skinById(skins[phase.winner ?? me])}>
           <GameOver
             outcome={phase.winner === null ? "draw" : phase.winner === me ? "win" : "lose"}
             round={round}
@@ -174,6 +183,7 @@ export default function Game({ view, me, act, onRestart, onExit, restartLabel = 
             rankNote={rankNote ?? null}
             playedCards={phase.result.plays[phase.winner ?? me]}
           />
+          </SkinContext.Provider>
         )}
       </main>
     </LayoutGroup>

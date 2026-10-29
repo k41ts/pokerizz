@@ -2,13 +2,11 @@
 
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { describeError, hostRoom, joinRoom, makeRoomCode, normalizeCode, send, type Link } from "@/lib/net";
+import { describeError, hostConnected, hostRoom, joinRoom, makeRoomCode, normalizeCode, send, type Connected, type Link } from "@/lib/net";
 import { play } from "@/lib/sound";
 import { ArrowIcon, PrimaryButton, SecondaryButton } from "./ui";
 
-export type Connected =
-  | { role: "host"; link: Link; names: [string, string]; userIds: [string | null, string | null] }
-  | { role: "guest"; link: Link };
+export type { Connected } from "@/lib/net";
 
 type Step =
   | { kind: "choose" }
@@ -18,13 +16,14 @@ type Step =
 interface Props {
   name: string;
   userId: string | null;
+  skin: string;
   /** Room code from a shared link; joins right away. */
   initialCode?: string;
   onConnected: (c: Connected) => void;
   onBack: () => void;
 }
 
-export default function Lobby({ name, userId, initialCode, onConnected, onBack }: Props) {
+export default function Lobby({ name, userId, skin, initialCode, onConnected, onBack }: Props) {
   const [step, setStep] = useState<Step>(initialCode ? { kind: "joining", busy: false, seconds: 0 } : { kind: "choose" });
   const [code, setCode] = useState(initialCode ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +50,7 @@ export default function Lobby({ name, userId, initialCode, onConnected, onBack }
       });
       play("connect");
       done.current = true;
-      onConnected({ role: "host", link, names: [name, hello.name || "Teman"], userIds: [userId, hello.userId] });
+      onConnected(hostConnected(link, { name, userId, skin }, hello));
     } catch (err) {
       setError(describeError(err));
       setStep({ kind: "choose" });
@@ -69,7 +68,7 @@ export default function Lobby({ name, userId, initialCode, onConnected, onBack }
     try {
       const link = await joinRoom(roomCode, (seconds) => setStep({ kind: "joining", busy: true, seconds }));
       linkRef.current = link;
-      send(link, { t: "hello", name, userId });
+      send(link, { t: "hello", name, userId, skin });
       done.current = true;
       onConnected({ role: "guest", link });
     } catch (err) {
