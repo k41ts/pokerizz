@@ -7,25 +7,6 @@ import type { SkinId } from "./skins";
  * The context is created on the first sound, which always follows a user gesture.
  */
 
-/** Every sound the game plays, in the order the lab lists them. */
-export const SFX_LIST = [
-  "select",
-  "deselect",
-  "deal",
-  "discard",
-  "play",
-  "flip",
-  "chip",
-  "stamp",
-  "combo",
-  "joker",
-  "win",
-  "hit",
-  "block",
-  "heal",
-  "lose",
-] as const;
-
 export type Sfx =
   | "select"
   | "deselect"
