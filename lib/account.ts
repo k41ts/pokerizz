@@ -72,6 +72,7 @@ export async function fetchLeaderboard(limit = 10): Promise<Profile[]> {
     (await supabase()
       ?.from("profiles")
       .select("id, username, stars, wins, losses")
+      .gt("stars", 0)
       .order("stars", { ascending: false })
       .order("wins", { ascending: false })
       .limit(limit)) ?? {};
