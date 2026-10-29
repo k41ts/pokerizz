@@ -8,30 +8,38 @@ import { JOKER_SLOTS } from "@/lib/game";
 import { MAX_HP } from "@/lib/scoring";
 import { AnimatedNumber, Pill } from "./ui";
 
-const BARS = 10;
-const PER_BAR = MAX_HP / BARS;
-
-/** HP as ten pill bars (10 HP each) with red caps, after the reference's bar chart. */
-function HpChart({ hp }: { hp: number }) {
+/**
+ * HP as one horizontal bar with a tick every 10 HP. On a hit the red fill drops at once
+ * and a pale trail follows a moment later, so you can see how much was lost.
+ */
+function HealthBar({ hp, size }: { hp: number; size: "sm" | "lg" }) {
+  const ratio = Math.max(0, Math.min(1, hp / MAX_HP));
+  const low = hp <= 25;
   return (
-    <div className="flex h-16 items-end gap-1 sm:h-20 sm:gap-1.5" role="meter" aria-label="HP" aria-valuemin={0} aria-valuemax={MAX_HP} aria-valuenow={hp}>
-      {Array.from({ length: BARS }, (_, i) => {
-        const fill = Math.min(1, Math.max(0, (hp - i * PER_BAR) / PER_BAR));
-        return (
-          <div
-            key={i}
-            className="relative h-full flex-1 overflow-hidden rounded-full outline-1 -outline-offset-1 outline-ink/15 outline-dashed"
-            style={{ height: `${55 + i * 5}%` }}
-          >
-            <div
-              className="absolute inset-0 flex flex-col rounded-full bg-paper transition-transform duration-700 ease-[var(--ease-out)]"
-              style={{ transform: `translateY(${(1 - fill) * 100}%)`, transitionDelay: `${(BARS - i) * 30}ms` }}
-            >
-              <div className="h-[30%] rounded-full bg-signal" />
-            </div>
-          </div>
-        );
-      })}
+    <div
+      className={`relative w-full overflow-hidden rounded-full bg-panel ring-1 ring-ink/10 ${size === "lg" ? "h-11" : "h-4 flex-1"}`}
+      role="meter"
+      aria-label="HP"
+      aria-valuemin={0}
+      aria-valuemax={MAX_HP}
+      aria-valuenow={hp}
+    >
+      <div
+        className="absolute inset-0 origin-left rounded-full bg-signal/30 transition-transform duration-700 ease-[var(--ease-out)]"
+        style={{ transform: `scaleX(${ratio})`, transitionDelay: "450ms" }}
+      />
+      <div
+        className={`absolute inset-0 origin-left rounded-full bg-signal transition-transform duration-500 ease-[var(--ease-out)] ${low ? "animate-pulse-dot" : ""}`}
+        style={{ transform: `scaleX(${ratio})` }}
+      />
+      {size === "lg" && (
+        <div className="pointer-events-none absolute inset-0 flex" aria-hidden>
+          {Array.from({ length: 10 }, (_, i) => (
+            <span key={i} className={`flex-1 ${i < 9 ? "border-r-2 border-paper/70" : ""}`} />
+          ))}
+        </div>
+      )}
+      {size === "lg" && <div className="pointer-events-none absolute inset-x-4 top-2 h-2 rounded-full bg-paper/25" aria-hidden />}
     </div>
   );
 }
@@ -79,19 +87,7 @@ export default function PlayerPanel({ player, hp, isYou, status, impact }: Props
             <p className="text-xs text-steel">{isYou ? "Kamu" : "Lawan"}</p>
             <p className="truncate font-display text-sm leading-tight">{player.isBot ? "Bot" : player.name}</p>
           </div>
-          <div
-            className="h-3 flex-1 overflow-hidden rounded-full bg-panel"
-            role="meter"
-            aria-label="HP"
-            aria-valuemin={0}
-            aria-valuemax={MAX_HP}
-            aria-valuenow={hp}
-          >
-            <div
-              className="h-full origin-left rounded-full bg-signal transition-transform duration-700 ease-[var(--ease-out)]"
-              style={{ transform: `scaleX(${Math.max(0, hp / MAX_HP)})` }}
-            />
-          </div>
+          <HealthBar hp={hp} size="sm" />
           <span className={`min-w-[4.25rem] text-right font-display text-xl leading-none ${hp <= 25 ? "text-signal" : ""}`}>
             <AnimatedNumber value={hp} />
           </span>
@@ -117,14 +113,14 @@ export default function PlayerPanel({ player, hp, isYou, status, impact }: Props
             <h2 className="font-display text-base leading-tight">{player.isBot ? "Bot" : player.name}</h2>
           </div>
           <div className="text-right">
-            <div className={`font-display text-4xl leading-none ${hp <= 25 ? "text-signal" : ""}`}>
+            <div className={`font-display text-5xl leading-none ${hp <= 25 ? "text-signal" : ""}`}>
               <AnimatedNumber value={hp} />
             </div>
             <p className="mt-1 text-sm text-steel">HP dari {MAX_HP}</p>
           </div>
         </div>
-        <div className="mt-3 rounded-2xl bg-panel p-3">
-          <HpChart hp={hp} />
+        <div className="mt-4">
+          <HealthBar hp={hp} size="lg" />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {Array.from({ length: JOKER_SLOTS }, (_, i) => {
