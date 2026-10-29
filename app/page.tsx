@@ -7,7 +7,7 @@ import { BotMatch, GuestMatch, HostMatch } from "@/components/Match";
 import Menu from "@/components/Menu";
 import Tutorial from "@/components/Tutorial";
 import { useAccount } from "@/lib/account";
-import { send } from "@/lib/net";
+import { normalizeCode, send } from "@/lib/net";
 
 type Screen = { kind: "menu" } | { kind: "lobby" } | { kind: "bot" } | ({ kind: "online" } & Connected);
 
@@ -36,6 +36,7 @@ export default function Home() {
   const [newPlayer, setNewPlayer] = useState(false);
   const [tutorial, setTutorial] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [linkCode, setLinkCode] = useState<string | undefined>();
   const account = useAccount();
 
   useEffect(() => {
@@ -43,6 +44,14 @@ export default function Home() {
     const first = load(TUTORIAL_KEY) !== "1";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after hydration
     if (saved) setName(saved);
+    // A shared invite link (?room=CODE) goes straight to joining that room.
+    const room = new URLSearchParams(window.location.search).get("room");
+    if (room) {
+      window.history.replaceState(null, "", window.location.pathname);
+      setLinkCode(normalizeCode(room));
+      setScreen({ kind: "lobby" });
+      return;
+    }
     setNewPlayer(first);
     setTutorial(first);
   }, []);
@@ -76,8 +85,15 @@ export default function Home() {
       <Lobby
         name={displayName}
         userId={account.userId}
-        onBack={() => setScreen({ kind: "menu" })}
-        onConnected={(c) => setScreen({ kind: "online", ...c })}
+        initialCode={linkCode}
+        onBack={() => {
+          setLinkCode(undefined);
+          setScreen({ kind: "menu" });
+        }}
+        onConnected={(c) => {
+          setLinkCode(undefined);
+          setScreen({ kind: "online", ...c });
+        }}
       />
     );
   } else if (screen.kind === "bot") {

@@ -21,7 +21,8 @@ export type Sfx =
   | "win"
   | "lose"
   | "click"
-  | "connect";
+  | "connect"
+  | "combo";
 
 const MUTE_KEY = "kartuduel:muted";
 
@@ -205,6 +206,17 @@ export function play(sfx: Sfx, step = 0) {
     case "click":
       tone(ac, { freq: 1400, type: "square", dur: 0.025, vol: 0.06 });
       break;
+    case "combo": {
+      // Longer, higher fanfare for stronger hands (step = hand rank 1..8).
+      const notes = [523, 659, 784, 1047, 1319, 1568, 2093];
+      const n = Math.min(notes.length, 2 + Math.ceil(step * 0.7));
+      notes.slice(0, n).forEach((f, i) => tone(ac, { freq: f, type: step >= 5 ? "sawtooth" : "triangle", dur: 0.18, vol: 0.09, start: i * 0.06 }));
+      if (step >= 5) {
+        tone(ac, { freq: 131, to: 262, type: "square", dur: 0.6, vol: 0.12 });
+        noise(ac, { dur: 0.5, vol: 0.2, freq: 4000, to: 800, q: 0.6 });
+      }
+      break;
+    }
     case "connect":
       tone(ac, { freq: 660, type: "sine", dur: 0.12, vol: 0.15 });
       tone(ac, { freq: 990, type: "sine", dur: 0.2, vol: 0.15, start: 0.1 });

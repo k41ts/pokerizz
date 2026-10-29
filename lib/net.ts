@@ -16,15 +16,19 @@ export type NetMessage =
   | { t: "sync" }
   /** Heartbeat, so a player whose phone went to sleep shows up as "not connected". */
   | { t: "ping" }
-  | { t: "bye" };
+  | { t: "bye" }
+  /** Guest looking for the host; the host answers "here". Works even before presence syncs. */
+  | { t: "knock" }
+  | { t: "here" };
 
 type Role = "host" | "guest";
 
 // No 0/O/1/I so codes are easy to read out loud.
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const JOIN_TIMEOUT = 10000;
-/** How long a guest looks for the host before saying the room doesn't exist. */
-const HOST_WAIT = 6000;
+/** How long a guest keeps knocking before saying the room doesn't exist. */
+const HOST_WAIT = 30000;
+const KNOCK_EVERY = 1200;
 
 export function makeRoomCode(): string {
   let code = "";
@@ -121,12 +125,27 @@ async function openChannel(code: string, role: Role): Promise<{ channel: Realtim
     throw err;
   });
   await channel.track({ role } satisfies Presence);
+
+  // Coming back from another app: announce ourselves again in case the socket dropped meanwhile.
+  const onVisible = () => {
+    if (document.visibilityState === "visible" && !closed) void channel.track({ role } satisfies Presence);
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  const close = link.close;
+  link.close = () => {
+    document.removeEventListener("visibilitychange", onVisible);
+    close();
+  };
   return { channel, link };
 }
 
 /** Opens a room and waits for a friend to say hello. */
 export async function hostRoom(code: string, onWaiting: (link: Link) => void): Promise<{ link: Link; hello: Extract<NetMessage, { t: "hello" }> }> {
   const { link } = await openChannel(code, "host");
+  // Answer knocks for the whole life of the room, so a guest can always find us.
+  link.onMessage((msg) => {
+    if (msg.t === "knock") link.send({ t: "here" });
+  });
   onWaiting(link);
   return new Promise((resolve) => {
     const off = link.onMessage((msg) => {
@@ -137,25 +156,38 @@ export async function hostRoom(code: string, onWaiting: (link: Link) => void): P
   });
 }
 
-/** Joins a room once its host is seen in the channel. */
-export async function joinRoom(code: string): Promise<Link> {
+/** Joins a room once the host answers a knock or shows up in presence. */
+export async function joinRoom(code: string, onSearching?: (seconds: number) => void): Promise<Link> {
   const { channel, link } = await openChannel(code, "guest");
+  let answered = false;
+  const off = link.onMessage((msg) => {
+    if (msg.t === "here") answered = true;
+  });
   const started = Date.now();
-  while (Date.now() - started < HOST_WAIT) {
-    const present = others(channel, "guest");
-    // Another guest is anything that isn't us or the host.
-    const guests = Object.values(channel.presenceState<Presence>()).flat().filter((p) => p.role === "guest");
-    if (present.some((p) => p.role === "host")) {
-      if (guests.length > 1) {
-        link.close();
-        throw new RoomError("full");
+  let lastKnock = 0;
+  try {
+    while (Date.now() - started < HOST_WAIT) {
+      const everyone = Object.values(channel.presenceState<Presence>()).flat();
+      const hostSeen = answered || others(channel, "guest").some((p) => p.role === "host");
+      if (hostSeen) {
+        // Counting ourselves, more than one guest means someone else got here first.
+        if (everyone.filter((p) => p.role === "guest").length > 1) throw new RoomError("full");
+        return link;
       }
-      return link;
+      if (Date.now() - lastKnock > KNOCK_EVERY) {
+        lastKnock = Date.now();
+        link.send({ t: "knock" });
+      }
+      onSearching?.(Math.floor((Date.now() - started) / 1000));
+      await new Promise((r) => setTimeout(r, 250));
     }
-    await new Promise((r) => setTimeout(r, 300));
+    throw new RoomError("not-found");
+  } catch (err) {
+    link.close();
+    throw err;
+  } finally {
+    off();
   }
-  link.close();
-  throw new RoomError("not-found");
 }
 
 export function send(link: Link, msg: NetMessage) {
@@ -164,7 +196,7 @@ export function send(link: Link, msg: NetMessage) {
 
 export function describeError(err: unknown): string {
   const kind = err instanceof RoomError ? err.kind : null;
-  if (kind === "not-found") return "Room ga ketemu. Cek lagi kodenya, dan pastiin temenmu masih di layar room.";
+  if (kind === "not-found") return "Room ga ketemu. Cek lagi kodenya, dan minta temenmu buka layar room di HP-nya (jangan ditutup atau pindah aplikasi).";
   if (kind === "full") return "Room itu udah ada dua pemain. Minta kode room baru.";
   if (kind === "no-server") return "Main online belum tersedia di server ini.";
   return "Ga bisa nyambung ke server room. Cek koneksi internet, lalu coba lagi.";

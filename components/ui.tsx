@@ -155,9 +155,9 @@ export function AnimatedNumber({ value, className = "" }: { value: number; class
 
 export function Logo() {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-ink py-1.5 pr-4 pl-1.5 text-paper">
+    <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-ink p-1.5 text-paper sm:pr-4" aria-label="Kartu Duel">
       <span className="grid size-7 place-items-center rounded-full bg-signal font-display text-[10px]">KD</span>
-      <span className="font-display text-xs tracking-wide">Kartu Duel</span>
+      <span className="font-display text-xs tracking-wide max-sm:hidden">Kartu Duel</span>
     </span>
   );
 }

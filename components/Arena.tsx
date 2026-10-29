@@ -4,9 +4,10 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/cards";
 import type { GameState, PlayerIndex, RoundResult } from "@/lib/game";
-import { chipValue, HAND_INFO } from "@/lib/hands";
+import { chipValue, HAND_INFO, HAND_TYPES } from "@/lib/hands";
 import { JOKERS } from "@/lib/jokers";
 import { play, type Sfx } from "@/lib/sound";
+import HandFx, { FX_HOLD } from "./HandFx";
 import PlayingCard from "./PlayingCard";
 import { AnimatedNumber, Pill, PrimaryButton } from "./ui";
 
@@ -15,7 +16,7 @@ const CARD_W = "w-[18.5%] max-w-[84px]";
 function Slots({ text }: { text: string }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="flex w-full justify-center gap-2">
+      <div className="flex w-full justify-center gap-2 max-sm:hidden">
         {Array.from({ length: 5 }, (_, i) => (
           <div key={i} className={`${CARD_W} aspect-[5/7] rounded-[9%] border border-dashed border-paper/20`} />
         ))}
@@ -25,11 +26,14 @@ function Slots({ text }: { text: string }) {
   );
 }
 
+/** Locked cards during a turn: small on phones so the hand below stays on screen. */
+const ROW_W = "w-[12%] max-w-[46px] sm:w-[18.5%] sm:max-w-[84px]";
+
 function Row({ cards, faceDown, layout }: { cards: Card[]; faceDown?: boolean; layout?: boolean }) {
   return (
-    <div className="flex w-full justify-center gap-2">
+    <div className="flex w-full justify-center gap-1.5 sm:gap-2">
       {cards.map((c, i) => (
-        <PlayingCard key={c.id} card={c} faceDown={faceDown} layoutId={layout ? c.id : undefined} index={i} className={CARD_W} />
+        <PlayingCard key={c.id} card={c} faceDown={faceDown} layoutId={layout ? c.id : undefined} index={i} className={ROW_W} />
       ))}
     </div>
   );
@@ -38,6 +42,7 @@ function Row({ cards, faceDown, layout }: { cards: Card[]; faceDown?: boolean; l
 type Beat =
   | { kind: "flip" }
   | { kind: "label"; side: PlayerIndex }
+  | { kind: "fx"; side: PlayerIndex }
   | { kind: "chip"; side: PlayerIndex; card: Card; value: number; step: number }
   | { kind: "bonus"; side: PlayerIndex; text: string; value: number }
   | { kind: "mult"; side: PlayerIndex; value: number }
@@ -47,6 +52,7 @@ type Beat =
 const DELAY: Record<Beat["kind"], number> = {
   flip: 250,
   label: 520,
+  fx: 120,
   chip: 210,
   bonus: 300,
   mult: 340,
@@ -59,6 +65,7 @@ function buildBeats(result: RoundResult, order: PlayerIndex[]): Beat[] {
   for (const side of order) {
     const s = result.scores[side];
     beats.push({ kind: "label", side });
+    if (s.hand !== "high_card") beats.push({ kind: "fx", side });
     // Combination cards first, then the extra cards, which also add their points.
     const extras = result.plays[side].filter((c) => !s.scoring.some((x) => x.id === c.id));
     [...s.scoring, ...extras].forEach((card, step) => beats.push({ kind: "chip", side, card, value: chipValue(card.rank), step }));
@@ -75,6 +82,8 @@ function sfxFor(beat: Beat, result: RoundResult): [Sfx, number][] {
       return [["flip", 0]];
     case "label":
       return [["stamp", 0]];
+    case "fx":
+      return [["combo", HAND_TYPES.indexOf(result.scores[beat.side].hand)]];
     case "chip":
       return [["chip", beat.step]];
     case "bonus":
@@ -114,9 +123,23 @@ function RevealSequence({ result, me, names, instant, onImpact, footer }: Reveal
   useEffect(() => {
     if (beat >= beats.length - 1) return;
     const next = beats[beat + 1];
-    const t = setTimeout(() => setBeat((b) => b + 1), DELAY[next.kind]);
+    const now = beats[beat];
+    // Hold on a combination's effect before counting its cards.
+    const hold = now?.kind === "fx" ? FX_HOLD[result.scores[now.side].hand] : 0;
+    const t = setTimeout(() => setBeat((b) => b + 1), DELAY[next.kind] + hold);
     return () => clearTimeout(t);
-  }, [beat, beats]);
+  }, [beat, beats, result]);
+
+  // The effect outlives its beat so it can finish animating.
+  const [fx, setFx] = useState<{ id: number; side: PlayerIndex } | null>(null);
+  useEffect(() => {
+    const now = beats[beat];
+    if (instant || now?.kind !== "fx") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- starts the effect for this beat
+    setFx({ id: beat, side: now.side });
+    const t = setTimeout(() => setFx(null), FX_HOLD[result.scores[now.side].hand] + 900);
+    return () => clearTimeout(t);
+  }, [beat, beats, instant, result]);
 
   useEffect(() => {
     if (beat < 0 || instant) return;
@@ -222,6 +245,7 @@ function RevealSequence({ result, me, names, instant, onImpact, footer }: Reveal
 
   return (
     <div className="flex flex-col gap-4">
+      {fx && <HandFx id={fx.id} hand={result.scores[fx.side].hand} suit={result.scores[fx.side].scoring[0].suit} />}
       {sideView(them)}
       <div className="relative flex h-10 items-center justify-center">
         <div className="absolute inset-x-0 top-1/2 h-px bg-paper/15" />
@@ -253,7 +277,14 @@ function RevealSequence({ result, me, names, instant, onImpact, footer }: Reveal
       <div className="flex min-h-11 items-center justify-center gap-3">
         {footer(done)}
         {!done && (
-          <button type="button" onClick={() => setBeat(beats.length - 1)} className="text-sm text-paper/50 underline-offset-4 hover:text-paper hover:underline">
+          <button
+            type="button"
+            onClick={() => {
+              setFx(null);
+              setBeat(beats.length - 1);
+            }}
+            className="text-sm text-paper/50 underline-offset-4 hover:text-paper hover:underline"
+          >
             Lewati animasi
           </button>
         )}
@@ -296,7 +327,7 @@ export default function Arena({ view, me, onImpact, onContinue }: ArenaProps) {
   }, [onImpact, result, reduce]);
 
   return (
-    <section ref={ref} className="relative flex min-h-[200px] sm:min-h-[260px] flex-col justify-center overflow-hidden rounded-[28px] bg-ink p-4 text-paper sm:p-5">
+    <section ref={ref} className="relative flex sm:min-h-[260px] flex-col justify-center overflow-hidden rounded-[22px] bg-ink p-3 text-paper sm:rounded-[28px] sm:p-5">
       <svg className="pointer-events-none absolute -right-24 -bottom-24 size-80 text-paper/[0.06]" viewBox="0 0 100 100" aria-hidden>
         <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" />
         <circle cx="50" cy="50" r="34" fill="none" stroke="currentColor" strokeDasharray="2 3" />
@@ -304,7 +335,7 @@ export default function Arena({ view, me, onImpact, onContinue }: ArenaProps) {
       </svg>
 
       {phase.kind === "turn" && (
-        <div className="relative flex flex-col gap-5">
+        <div className="relative flex flex-col gap-3 sm:gap-5">
           {players[them].played ? (
             <div className="flex flex-col items-center gap-2">
               <Row cards={players[them].played!} faceDown />

@@ -18,7 +18,8 @@ let client: SupabaseClient | null = null;
 
 export function supabase(): SupabaseClient | null {
   if (!SB_URL || !KEY) return null;
-  client ??= createClient(SB_URL, KEY);
+  // Heartbeats from a worker keep room connections alive while a phone tab is in the background.
+  client ??= createClient(SB_URL, KEY, { realtime: { worker: true } });
   return client;
 }
 

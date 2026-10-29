@@ -13,18 +13,20 @@ export type Connected =
 type Step =
   | { kind: "choose" }
   | { kind: "hosting"; code: string; ready: boolean }
-  | { kind: "joining"; busy: boolean };
+  | { kind: "joining"; busy: boolean; seconds: number };
 
 interface Props {
   name: string;
   userId: string | null;
+  /** Room code from a shared link; joins right away. */
+  initialCode?: string;
   onConnected: (c: Connected) => void;
   onBack: () => void;
 }
 
-export default function Lobby({ name, userId, onConnected, onBack }: Props) {
-  const [step, setStep] = useState<Step>({ kind: "choose" });
-  const [code, setCode] = useState("");
+export default function Lobby({ name, userId, initialCode, onConnected, onBack }: Props) {
+  const [step, setStep] = useState<Step>(initialCode ? { kind: "joining", busy: false, seconds: 0 } : { kind: "choose" });
+  const [code, setCode] = useState(initialCode ?? "");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const linkRef = useRef<Link | null>(null);
@@ -56,25 +58,34 @@ export default function Lobby({ name, userId, onConnected, onBack }: Props) {
     }
   }
 
-  async function join() {
-    const roomCode = normalizeCode(code);
+  async function join(codeToJoin = code) {
+    const roomCode = normalizeCode(codeToJoin);
     if (roomCode.length !== 5) {
       setError("Kode room isinya 5 huruf/angka.");
       return;
     }
     setError(null);
-    setStep({ kind: "joining", busy: true });
+    setStep({ kind: "joining", busy: true, seconds: 0 });
     try {
-      const link = await joinRoom(roomCode);
+      const link = await joinRoom(roomCode, (seconds) => setStep({ kind: "joining", busy: true, seconds }));
       linkRef.current = link;
       send(link, { t: "hello", name, userId });
       done.current = true;
       onConnected({ role: "guest", link });
     } catch (err) {
       setError(describeError(err));
-      setStep({ kind: "joining", busy: false });
+      setStep({ kind: "joining", busy: false, seconds: 0 });
     }
   }
+
+  // Opened from a shared link: join straight away.
+  const autoJoined = useRef(false);
+  useEffect(() => {
+    if (!initialCode || autoJoined.current) return;
+    autoJoined.current = true;
+    void join(initialCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once for the link's code
+  }, [initialCode]);
 
   async function copy(text: string) {
     try {
@@ -86,13 +97,29 @@ export default function Lobby({ name, userId, onConnected, onBack }: Props) {
     }
   }
 
+  /** Native share sheet on phones (WhatsApp etc.), copying the link elsewhere. */
+  async function share(roomCode: string) {
+    const url = `${window.location.origin}/?room=${roomCode}`;
+    const text = `Main Kartu Duel bareng aku! Kode room: ${roomCode}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Kartu Duel", text, url });
+        return;
+      } catch {
+        // Share sheet closed: fall back to copying.
+      }
+    }
+    await copy(`${text}
+${url}`);
+  }
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col justify-center gap-4 p-4">
       <button type="button" onClick={onBack} className="self-start text-sm text-steel hover:text-ink">
         ← Kembali
       </button>
       <h1 className="font-display text-2xl leading-tight sm:text-4xl">Main online sama teman</h1>
-      <p className="max-w-lg text-sm text-ink/70">
+      <p className="max-w-lg text-base text-ink/70">
         Satu orang bikin room dan kasih kodenya. Yang lain masukin kode itu di HP atau laptopnya sendiri. Kalian main barengan, kartu masing-masing ga kelihatan di layar lawan.
       </p>
 
@@ -116,7 +143,7 @@ export default function Lobby({ name, userId, onConnected, onBack }: Props) {
             type="button"
             onClick={() => {
               play("click");
-              setStep({ kind: "joining", busy: false });
+              setStep({ kind: "joining", busy: false, seconds: 0 });
             }}
             className="press group relative flex min-h-44 flex-col justify-between rounded-[28px] bg-paper p-6 text-left"
           >
@@ -141,13 +168,20 @@ export default function Lobby({ name, userId, onConnected, onBack }: Props) {
             <span className="font-display text-5xl tracking-[0.2em] sm:text-6xl" aria-live="polite">
               {step.ready ? step.code : "·····"}
             </span>
-            {step.ready && (
-              <SecondaryButton onClick={() => void copy(step.code)}>{copied ? "Tersalin" : "Salin kode"}</SecondaryButton>
-            )}
           </div>
-          <p className="mt-4 flex items-center gap-2 text-sm text-ink/70">
-            <span className="animate-pulse-dot size-2 rounded-full bg-signal" />
-            {step.ready ? "Nunggu temanmu gabung. Biarin layar ini kebuka." : "Lagi bikin room…"}
+          {step.ready && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PrimaryButton tone="red" onClick={() => void share(step.code)} className="text-base">
+                Bagikan link
+              </PrimaryButton>
+              <SecondaryButton onClick={() => void copy(step.code)} className="text-base">
+                {copied ? "Tersalin" : "Salin kode"}
+              </SecondaryButton>
+            </div>
+          )}
+          <p className="mt-4 flex items-center gap-2 text-base text-ink/70">
+            <span className="animate-pulse-dot size-2 shrink-0 rounded-full bg-signal" />
+            {step.ready ? "Nunggu temanmu gabung. Abis kirim link, balik lagi ke layar ini ya." : "Lagi bikin room…"}
           </p>
         </motion.section>
       )}
@@ -178,9 +212,15 @@ export default function Lobby({ name, userId, onConnected, onBack }: Props) {
             placeholder="AB3CD"
             className="w-full rounded-2xl bg-panel px-5 py-4 font-display text-3xl tracking-[0.2em] outline-none placeholder:text-ink/20 focus-visible:ring-2 focus-visible:ring-signal"
           />
-          <PrimaryButton tone="red" disabled={step.busy || code.length !== 5} onClick={() => void join()} className="self-start">
-            {step.busy ? "Nyambung…" : "Gabung"}
+          <PrimaryButton tone="red" disabled={step.busy || code.length !== 5} onClick={() => void join()} className="self-start text-base">
+            {step.busy ? "Nyari room…" : "Gabung"}
           </PrimaryButton>
+          {step.busy && step.seconds >= 3 && (
+            <p className="flex items-center gap-2 text-base text-ink/70">
+              <span className="animate-pulse-dot size-2 shrink-0 rounded-full bg-signal" />
+              Host belum jawab ({step.seconds} detik). Minta dia buka layar room di HP-nya.
+            </p>
+          )}
         </motion.form>
       )}
 

@@ -94,8 +94,8 @@ export default function Game({ view, me, act, onRestart, onExit, restartLabel = 
 
   return (
     <LayoutGroup>
-      <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-3 p-3 sm:p-5">
-        <header className="flex flex-wrap items-center justify-between gap-2 rounded-full bg-panel p-1.5 pr-2">
+      <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-2 p-2.5 sm:gap-3 sm:p-5">
+        <header className="flex items-center justify-between gap-1.5 rounded-full bg-panel p-1.5 sm:gap-2 sm:pr-2">
           <Logo />
           <div className="flex items-center gap-1.5">
             <Pill tone="light">Ronde {round}</Pill>
@@ -107,12 +107,14 @@ export default function Game({ view, me, act, onRestart, onExit, restartLabel = 
             <button
               type="button"
               onClick={() => setGuideOpen(true)}
-              className="press rounded-full bg-paper px-3.5 py-2 text-sm font-semibold ring-1 ring-ink/10 hover:bg-panel"
+              aria-label="Daftar kombinasi"
+              className="press rounded-full bg-paper px-3 py-2 text-sm font-semibold ring-1 ring-ink/10 hover:bg-panel sm:px-3.5"
             >
-              Kombinasi
+              <span className="sm:hidden">Combo</span>
+              <span className="max-sm:hidden">Kombinasi</span>
             </button>
             <SoundToggle />
-            <button type="button" onClick={onExit} className="press rounded-full bg-ink px-4 py-2 text-sm font-semibold text-paper">
+            <button type="button" onClick={onExit} className="press rounded-full bg-ink px-3 py-2 text-sm font-semibold text-paper sm:px-4">
               Keluar
             </button>
           </div>
@@ -121,16 +123,16 @@ export default function Game({ view, me, act, onRestart, onExit, restartLabel = 
         {banner}
         {phase.kind === "turn" && <RoundBanner key={round} round={round} />}
         <Sheet open={guideOpen} onClose={() => setGuideOpen(false)} title="Daftar kombinasi">
-          <ComboGuide compact />
+          <ComboGuide />
         </Sheet>
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(280px,340px)_1fr]">
+        <div className="grid gap-2 sm:gap-3 lg:grid-cols-[minmax(280px,340px)_1fr]">
           <div className="flex flex-col gap-3 max-lg:contents">
             <div className="max-lg:order-1">
-              <PlayerPanel player={players[them]} hp={hpOf(them)} isYou={false} status={status(them)} impact={impactOf(them)} compact />
+              <PlayerPanel player={players[them]} hp={hpOf(them)} isYou={false} status={status(them)} impact={impactOf(them)} />
             </div>
-            <div className="max-lg:order-5">
-              <PlayerPanel player={players[me]} hp={hpOf(me)} isYou status={status(me)} impact={impactOf(me)} compact />
+            <div className="max-lg:order-3">
+              <PlayerPanel player={players[me]} hp={hpOf(me)} isYou status={status(me)} impact={impactOf(me)} />
             </div>
           </div>
           <div className="flex flex-col gap-3 max-lg:contents">
