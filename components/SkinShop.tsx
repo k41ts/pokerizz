@@ -111,7 +111,8 @@ export default function SkinShop({ open, onClose, profile, onChanged, onSignIn }
               <button
                 type="button"
                 onClick={() => {
-                  play("play");
+                  play("play", 0, id);
+                  setTimeout(() => play("win", 0, id), 700);
                   setPreview(id);
                 }}
                 className="press text-sm font-semibold text-ink/70 underline underline-offset-4 hover:text-ink"

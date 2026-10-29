@@ -145,8 +145,11 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
 
   useEffect(() => {
     if (beat < 0 || instant) return;
-    for (const [sfx, step] of sfxFor(beats[beat], result)) play(sfx, step);
-  }, [beat, beats, result, instant]);
+    const now = beats[beat];
+    // Each side's cards sound in that player's skin; the clash itself uses yours.
+    const voice = "side" in now ? skins[now.side] : skins[me];
+    for (const [sfx, step] of sfxFor(now, result)) play(sfx, step, voice);
+  }, [beat, beats, result, instant, skins, me]);
 
   useEffect(() => {
     if (beat >= clashAt && !impacted.current) {

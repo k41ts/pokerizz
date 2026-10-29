@@ -10,6 +10,7 @@ import Menu from "@/components/Menu";
 import Tutorial from "@/components/Tutorial";
 import { useAccount } from "@/lib/account";
 import { normalizeCode, send } from "@/lib/net";
+import { setSoundSkin } from "@/lib/sound";
 
 type Screen =
   | { kind: "menu" }
@@ -77,6 +78,8 @@ export default function Home() {
 
   const displayName = account.profile?.username ?? (name.trim() || "Pemain");
   const mySkin = account.profile?.skin ?? "classic";
+  // Your skin's voice is the default for every sound you make.
+  useEffect(() => setSoundSkin(mySkin), [mySkin]);
   const search = () => setScreen({ kind: "search", id: Date.now() });
 
   const exit = () => {
