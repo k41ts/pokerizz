@@ -4,7 +4,9 @@ import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo } from "react";
 import { createRng, type Card } from "@/lib/cards";
 import { play } from "@/lib/sound";
+import { useSkin } from "@/lib/skins";
 import CardArt from "./CardArt";
+import { WIN_THEME, WinScene } from "./SkinFx";
 import type { RankNote } from "./Game";
 import { PrimaryButton, SecondaryButton } from "./ui";
 
@@ -76,6 +78,9 @@ function Letters({ text, delay }: { text: string; delay: number }) {
 export default function GameOver({ outcome, round, hp, onRestart, onExit, restartLabel, rankNote, playedCards }: Props) {
   const reduce = useReducedMotion();
   const win = outcome === "win";
+  // When you win, the screen is dressed in your skin. Only you see it.
+  const skin = useSkin();
+  const theme = WIN_THEME[skin.id];
 
   useEffect(() => {
     const timers = [setTimeout(() => play(win ? "win" : outcome === "lose" ? "lose" : "block"), 450)];
@@ -92,19 +97,15 @@ export default function GameOver({ outcome, round, hp, onRestart, onExit, restar
       aria-modal="true"
       aria-label={win ? "Kamu menang" : outcome === "lose" ? "Kamu kalah" : "Seri"}
       className={`fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden p-6 text-center ${
-        win ? "bg-signal text-paper" : "bg-concrete/90 text-ink backdrop-blur-md backdrop-grayscale"
+        win ? "" : "bg-concrete/90 text-ink backdrop-blur-md backdrop-grayscale"
       }`}
+      style={win ? { background: theme.bg, color: theme.text } : undefined}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.35, delay: 0.3 }}
     >
-      {win && !reduce && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 left-1/2 size-[180vmax] -translate-x-1/2 -translate-y-1/2 animate-[spin_24s_linear_infinite] bg-[repeating-conic-gradient(rgba(255,255,255,0.13)_0deg_9deg,transparent_9deg_24deg)]"
-        />
-      )}
-      {!reduce && outcome !== "draw" && <Shards dark={win} />}
+      {win && <WinScene skin={skin} />}
+      {!reduce && outcome === "lose" && <Shards dark={false} />}
 
       {fan.length > 0 && (
         <div className="relative mb-2 h-32 w-full max-w-sm sm:h-40" aria-hidden>
@@ -133,7 +134,9 @@ export default function GameOver({ outcome, round, hp, onRestart, onExit, restar
         animate={outcome === "lose" && !reduce ? { transform: ["translateX(0px)", "translateX(-10px)", "translateX(8px)", "translateX(-4px)", "translateX(0px)"] } : undefined}
         transition={{ duration: 0.45, delay: 1.0 }}
       >
-        <Letters text={title} delay={0.45} />
+        <div style={win && skin.id === "neon" ? { textShadow: "0 0 18px #22d3ee, 0 0 42px #f472b6" } : undefined}>
+          <Letters text={title} delay={0.45} />
+        </div>
         {outcome === "lose" && !reduce && (
           <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden>
             <motion.path
@@ -150,7 +153,8 @@ export default function GameOver({ outcome, round, hp, onRestart, onExit, restar
       </motion.div>
 
       <motion.p
-        className={`relative mt-4 text-base ${win ? "text-paper/85" : "text-ink/70"}`}
+        className={`relative mt-4 text-base ${win ? "" : "text-ink/70"}`}
+        style={win ? { color: theme.muted } : undefined}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3, delay: 1.2 }}
@@ -178,7 +182,7 @@ export default function GameOver({ outcome, round, hp, onRestart, onExit, restar
         animate={{ opacity: 1, transform: "translateY(0px)" }}
         transition={{ duration: 0.35, ease: EASE_OUT, delay: 1.6 }}
       >
-        <PrimaryButton autoFocus onClick={onRestart} className="px-6 text-base">
+        <PrimaryButton autoFocus tone={win ? theme.button : "dark"} onClick={onRestart} className="px-6 text-base">
           {restartLabel}
         </PrimaryButton>
         <SecondaryButton onClick={onExit} className="text-base">

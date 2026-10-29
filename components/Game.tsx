@@ -11,6 +11,7 @@ import GameOver from "./GameOver";
 import HandTray from "./HandTray";
 import JokerPicker from "./JokerPicker";
 import PlayerPanel, { type Impact } from "./PlayerPanel";
+import { PlayBurst } from "./SkinFx";
 import { Logo, Pill, SoundToggle } from "./ui";
 
 /** An action as the local player sends it; the controller adds who sent it. */
@@ -92,6 +93,13 @@ export default function Game({
 }: Props) {
   const them: PlayerIndex = me === 0 ? 1 : 0;
   const mySkin = skinById(skins[me]);
+  // Your skin's flourish when you lock in cards; only shown on your screen.
+  const [burst, setBurst] = useState(0);
+  useEffect(() => {
+    if (!burst) return;
+    const t = setTimeout(() => setBurst(0), 1400);
+    return () => clearTimeout(t);
+  }, [burst]);
   const { phase, players, round } = view;
   // HP drops only when the reveal reaches the clash, not when the state arrives.
   const [impactRound, setImpactRound] = useState(0);
@@ -130,6 +138,7 @@ export default function Game({
 
         {banner}
         {phase.kind === "turn" && <RoundBanner key={round} round={round} />}
+        {burst > 0 && <PlayBurst key={burst} skin={mySkin} />}
 
         <div className="grid grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
           <div className="flex flex-col gap-3 max-lg:contents">
@@ -163,7 +172,10 @@ export default function Game({
                     player={players[me]}
                     turnSeconds={turnSeconds}
                     onDiscard={(cardIds) => act({ type: "discard", cardIds })}
-                    onPlay={(cardIds) => act({ type: "play", cardIds })}
+                    onPlay={(cardIds) => {
+                      setBurst(Date.now());
+                      act({ type: "play", cardIds });
+                    }}
                   />
                 </SkinContext.Provider>
               </div>

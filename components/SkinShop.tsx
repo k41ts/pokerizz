@@ -1,14 +1,48 @@
 "use client";
 
+import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { buySkin, equipSkin, type Profile } from "@/lib/account";
 import { card } from "@/lib/cards";
-import { SKIN_IDS, SKINS, type SkinId } from "@/lib/skins";
+import { SKIN_IDS, SKINS, type Skin, type SkinId } from "@/lib/skins";
 import { play } from "@/lib/sound";
 import CardArt from "./CardArt";
 import Sheet from "./Sheet";
+import { PlayBurst, WIN_THEME, WinScene } from "./SkinFx";
 
 const PREVIEW = [card(13, "H"), card(14, "S")];
+
+/** Shows a skin's card-play flourish, then its win screen, without playing a game. */
+function EffectPreview({ skin, onClose }: { skin: Skin; onClose: () => void }) {
+  const theme = WIN_THEME[skin.id];
+  return (
+    <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Efek skin ${skin.name}`}
+      className="fixed inset-0 z-[60] flex cursor-pointer flex-col items-center justify-center gap-4 overflow-hidden p-6 text-center"
+      style={{ background: theme.bg, color: theme.text }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      onClick={onClose}
+    >
+      <WinScene skin={skin} />
+      <PlayBurst skin={skin} />
+      <p
+        className="relative font-display text-[clamp(2.6rem,13vw,6rem)] leading-none"
+        style={skin.id === "neon" ? { textShadow: "0 0 18px #22d3ee, 0 0 42px #f472b6" } : undefined}
+      >
+        MENANG
+      </p>
+      <p className="relative text-base" style={{ color: theme.muted }}>
+        Skin {skin.name}. Ketuk di mana aja buat tutup.
+      </p>
+    </motion.div>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -21,6 +55,7 @@ interface Props {
 /** Card skins: bought with points from ranked games, shown to opponents during play. */
 export default function SkinShop({ open, onClose, profile, onChanged, onSignIn }: Props) {
   const [busy, setBusy] = useState<SkinId | null>(null);
+  const [preview, setPreview] = useState<SkinId | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function act(id: SkinId) {
@@ -75,6 +110,16 @@ export default function SkinShop({ open, onClose, profile, onChanged, onSignIn }
               </div>
               <button
                 type="button"
+                onClick={() => {
+                  play("play");
+                  setPreview(id);
+                }}
+                className="press text-sm font-semibold text-ink/70 underline underline-offset-4 hover:text-ink"
+              >
+                Lihat efek
+              </button>
+              <button
+                type="button"
                 disabled={busy !== null || equipped || (!owned && !!profile && !affordable)}
                 onClick={() => void act(id)}
                 className={`press mt-auto rounded-full px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
@@ -88,6 +133,12 @@ export default function SkinShop({ open, onClose, profile, onChanged, onSignIn }
         })}
       </ul>
       <p className="mt-4 text-sm text-ink/60">Dapat poin dari main ranked pakai akun: menang +30, kalah +10.</p>
+      {/* Portal: the sheet panel is transformed, which would trap a fixed overlay inside it. */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>{preview && <EffectPreview skin={SKINS[preview]} onClose={() => setPreview(null)} />}</AnimatePresence>,
+          document.body,
+        )}
     </Sheet>
   );
 }
