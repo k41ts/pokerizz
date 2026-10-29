@@ -50,7 +50,7 @@ export default function Lobby({ name, userId, skin, initialCode, onConnected, on
       });
       play("connect");
       done.current = true;
-      onConnected(hostConnected(link, { name, userId, skin }, hello));
+      onConnected(hostConnected(roomCode, link, { name, userId, skin }, hello));
     } catch (err) {
       setError(describeError(err));
       setStep({ kind: "choose" });
@@ -70,7 +70,7 @@ export default function Lobby({ name, userId, skin, initialCode, onConnected, on
       linkRef.current = link;
       send(link, { t: "hello", name, userId, skin });
       done.current = true;
-      onConnected({ role: "guest", link });
+      onConnected({ role: "guest", code: roomCode, link });
     } catch (err) {
       setError(describeError(err));
       setStep({ kind: "joining", busy: false, seconds: 0 });

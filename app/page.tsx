@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PrimaryButton } from "@/components/ui";
 import AccountSheet from "@/components/AccountSheet";
 import Matchmaking from "@/components/Matchmaking";
 import SkinShop from "@/components/SkinShop";
@@ -9,15 +10,19 @@ import { BotMatch, GuestMatch, HostMatch, type BotOpponent } from "@/components/
 import Menu from "@/components/Menu";
 import Tutorial from "@/components/Tutorial";
 import { useAccount } from "@/lib/account";
-import { normalizeCode, send } from "@/lib/net";
+import type { GameState } from "@/lib/game";
+import { describeError, joinRoom, normalizeCode, rehostRoom, send } from "@/lib/net";
+import { clearMatch, loadMatch } from "@/lib/resume";
 import { setSoundSkin } from "@/lib/sound";
 
 type Screen =
   | { kind: "menu" }
   | { kind: "lobby" }
   | { kind: "search"; id: number }
-  | { kind: "bot"; opponent: BotOpponent; id: number }
-  | ({ kind: "online" } & Connected);
+  | { kind: "bot"; opponent: BotOpponent; id: number; resume?: { state: GameState; botMatchId: string | null } }
+  | ({ kind: "online"; resume?: { state: GameState; matchId: string } } & Connected)
+  /** Reopening the room of a match that was running before the page reloaded. */
+  | { kind: "resuming"; error: string | null };
 
 const NAME_KEY = "kartuduel:name";
 const TUTORIAL_KEY = "kartuduel:tutorial-done";
@@ -48,6 +53,34 @@ export default function Home() {
   const [skinsOpen, setSkinsOpen] = useState(false);
   const account = useAccount();
 
+  /** Continue the match that was running before the page reloaded. */
+  function resumeMatch(saved: NonNullable<ReturnType<typeof loadMatch>>) {
+    if (saved.kind === "bot") {
+      setScreen({ kind: "bot", id: Date.now(), opponent: saved.opponent, resume: { state: saved.state, botMatchId: saved.botMatchId } });
+      return;
+    }
+    setScreen({ kind: "resuming", error: null });
+    const rejoin =
+      saved.kind === "host"
+        ? rehostRoom(saved.code).then((link) =>
+            setScreen({
+              kind: "online",
+              role: "host",
+              code: saved.code,
+              link,
+              names: saved.names,
+              userIds: saved.userIds,
+              skins: saved.skins,
+              resume: { state: saved.state, matchId: saved.matchId },
+            }),
+          )
+        : joinRoom(saved.code).then((link) => setScreen({ kind: "online", role: "guest", code: saved.code, link }));
+    rejoin.catch((err) => {
+      clearMatch();
+      setScreen({ kind: "resuming", error: describeError(err) });
+    });
+  }
+
   useEffect(() => {
     const saved = load(NAME_KEY);
     const first = load(TUTORIAL_KEY) !== "1";
@@ -57,8 +90,14 @@ export default function Home() {
     const room = new URLSearchParams(window.location.search).get("room");
     if (room) {
       window.history.replaceState(null, "", window.location.pathname);
+      clearMatch();
       setLinkCode(normalizeCode(room));
       setScreen({ kind: "lobby" });
+      return;
+    }
+    const match = loadMatch();
+    if (match) {
+      resumeMatch(match);
       return;
     }
     setNewPlayer(first);
@@ -83,6 +122,7 @@ export default function Home() {
   const search = () => setScreen({ kind: "search", id: Date.now() });
 
   const exit = () => {
+    clearMatch();
     if (screen.kind === "online") {
       const { link } = screen;
       send(link, { t: "bye" });
@@ -139,22 +179,41 @@ export default function Home() {
         onExit={exit}
         onSearchAgain={search}
         onRanked={account.refresh}
+        resume={screen.resume}
       />
     );
   } else if (screen.kind === "online") {
     content =
       screen.role === "host" ? (
         <HostMatch
+          code={screen.code}
           link={screen.link}
           names={screen.names}
           userIds={screen.userIds}
           skins={screen.skins}
           onExit={exit}
           onRanked={account.refresh}
+          resume={screen.resume}
         />
       ) : (
-        <GuestMatch link={screen.link} onExit={exit} onRanked={account.refresh} />
+        <GuestMatch code={screen.code} link={screen.link} onExit={exit} onRanked={account.refresh} />
       );
+  } else if (screen.kind === "resuming") {
+    content = (
+      <main className="grid min-h-dvh place-items-center p-6 text-center">
+        {screen.error ? (
+          <div className="flex max-w-sm flex-col items-center gap-4">
+            <p className="font-display text-xl">Pertandingan ga bisa dilanjutin</p>
+            <p className="text-base text-ink/70">{screen.error}</p>
+            <PrimaryButton onClick={() => setScreen({ kind: "menu" })}>Ke menu</PrimaryButton>
+          </div>
+        ) : (
+          <p className="flex items-center gap-2 text-base text-ink/70">
+            <span className="animate-pulse-dot size-2 rounded-full bg-signal" /> Nyambung lagi ke pertandinganmu…
+          </p>
+        )}
+      </main>
+    );
   } else {
     content = (
       <Menu

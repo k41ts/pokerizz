@@ -5,6 +5,7 @@ import { finishBotMatch, reportLoss, startBotMatch } from "@/lib/account";
 import { botMove, chooseJoker, type BotLevel } from "@/lib/bot";
 import { createGame, gameReducer, viewFor, type GameAction, type GameState, type PlayerIndex } from "@/lib/game";
 import { send, type Link } from "@/lib/net";
+import { clearMatch, saveMatch } from "@/lib/resume";
 import { play } from "@/lib/sound";
 import Game, { TURN_SECONDS, type LocalAction, type RankNote } from "./Game";
 import { PrimaryButton } from "./ui";
@@ -39,6 +40,7 @@ export function BotMatch({
   onExit,
   onSearchAgain,
   onRanked,
+  resume,
 }: {
   name: string;
   skin: string;
@@ -46,6 +48,8 @@ export function BotMatch({
   onExit: () => void;
   onSearchAgain?: () => void;
   onRanked?: () => void;
+  /** A game saved before the page reloaded. */
+  resume?: { state: GameState; botMatchId: string | null };
 }) {
   const ranked = opponent.kind === "ranked";
   const level: BotLevel = ranked ? opponent.level : 2;
@@ -57,7 +61,7 @@ export function BotMatch({
     return g;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- names only change with a new match
   }, [ranked, names[0], names[1]]);
-  const [state, dispatch] = useReducer(hostReducer, undefined, newGame);
+  const [state, dispatch] = useReducer(hostReducer, undefined, () => resume?.state ?? newGame());
   const { phase, players } = state;
   const bot = players[1];
 
@@ -81,13 +85,22 @@ export function BotMatch({
   }, [phase, bot, level, ranked]);
 
   // Ranked: register the match when it starts, report the result when it ends.
-  const matchId = useRef<Promise<string | null> | null>(null);
+  const matchId = useRef<Promise<string | null> | null>(resume?.botMatchId ? Promise.resolve(resume.botMatchId) : null);
+  const savedMatchId = useRef<string | null>(resume?.botMatchId ?? null);
   const [note, setNote] = useState<RankNote | null>(null);
   const signedIn = ranked && opponent.signedIn;
   // A ranked bot match is one game; "play again" searches for a new opponent.
   useEffect(() => {
-    if (signedIn && !matchId.current) matchId.current = startBotMatch(level);
+    if (!signedIn || matchId.current) return;
+    matchId.current = startBotMatch(level);
+    void matchId.current.then((id) => (savedMatchId.current = id));
   }, [signedIn, level]);
+
+  // Saved on every move so a reload picks up right here; a finished game is forgotten.
+  useEffect(() => {
+    if (state.phase.kind === "gameOver") clearMatch();
+    else saveMatch({ kind: "bot", state, opponent, botMatchId: savedMatchId.current });
+  }, [state, opponent]);
 
   const winner = phase.kind === "gameOver" ? phase.winner : undefined;
   useEffect(() => {
@@ -243,22 +256,27 @@ function useLinkStatus(link: Link): LinkStatus {
 
 /** The host runs the real game and sends the guest only what the guest may see. */
 export function HostMatch({
+  code,
   link,
   names,
   userIds,
   skins,
   onExit,
   onRanked,
+  resume,
 }: {
+  code: string;
   link: Link;
   names: [string, string];
   userIds: [string | null, string | null];
   skins: [string, string];
   onExit: () => void;
   onRanked: () => void;
+  /** The game this host was running before the page reloaded. */
+  resume?: { state: GameState; matchId: string };
 }) {
-  const [state, dispatch] = useReducer(hostReducer, undefined, () => createGame("online", newSeed(), names));
-  const [matchId, setMatchId] = useState(newMatchId);
+  const [state, dispatch] = useReducer(hostReducer, undefined, () => resume?.state ?? createGame("online", newSeed(), names));
+  const [matchId, setMatchId] = useState(() => resume?.matchId ?? newMatchId());
   const status = useLinkStatus(link);
   const restart = useCallback(() => {
     dispatch({ type: "reset", state: createGame("online", newSeed(), names) });
@@ -300,6 +318,12 @@ export function HostMatch({
     send(link, { t: "state", state: viewFor(state, 1) });
   }, [link, state]);
 
+  // Saved on every move, so a reload reopens the room and carries on.
+  useEffect(() => {
+    if (state.phase.kind === "gameOver") clearMatch();
+    else saveMatch({ kind: "host", code, state, matchId, names, userIds, skins });
+  }, [code, state, matchId, names, userIds, skins]);
+
   // The guest's own timer plays for them; this backs it up if their device stalls.
   const guestWaiting = state.phase.kind === "turn" && !state.players[1].played;
   const guestHand = state.players[1].hand;
@@ -332,8 +356,14 @@ export function HostMatch({
 }
 
 /** The guest renders whatever the host sends and forwards its own moves. */
-export function GuestMatch({ link, onExit, onRanked }: { link: Link; onExit: () => void; onRanked: () => void }) {
+export function GuestMatch({ code, link, onExit, onRanked }: { code: string; link: Link; onExit: () => void; onRanked: () => void }) {
   const [view, setView] = useState<GameState | null>(null);
+  // The host keeps the game; remembering the room is enough to rejoin after a reload.
+  const over = view?.phase.kind === "gameOver";
+  useEffect(() => {
+    if (over) clearMatch();
+    else saveMatch({ kind: "guest", code });
+  }, [code, over]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const rankNote = useRankNote(view, 1, meta, onRanked);
   const status = useLinkStatus(link);

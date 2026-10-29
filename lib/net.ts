@@ -2,6 +2,7 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "./account";
+import { presenceId } from "./resume";
 import type { GameAction, GameState } from "./game";
 
 /** Messages between the two browsers. The host runs the game; the guest only sends actions. */
@@ -54,13 +55,19 @@ export interface Link {
 
 /** A room both players are in, from the lobby or from matchmaking. */
 export type Connected =
-  | { role: "host"; link: Link; names: [string, string]; userIds: [string | null, string | null]; skins: [string, string] }
-  | { role: "guest"; link: Link };
+  | { role: "host"; code: string; link: Link; names: [string, string]; userIds: [string | null, string | null]; skins: [string, string] }
+  | { role: "guest"; code: string; link: Link };
 
 /** The host side of a room once the guest has said hello. */
-export function hostConnected(link: Link, me: { name: string; userId: string | null; skin: string }, hello: Extract<NetMessage, { t: "hello" }>): Connected {
+export function hostConnected(
+  code: string,
+  link: Link,
+  me: { name: string; userId: string | null; skin: string },
+  hello: Extract<NetMessage, { t: "hello" }>,
+): Connected {
   return {
     role: "host",
+    code,
     link,
     names: [me.name, hello.name || "Teman"],
     userIds: [me.userId, hello.userId],
@@ -89,7 +96,8 @@ async function openChannel(code: string, role: Role): Promise<{ channel: Realtim
   if (!sb) throw new RoomError("no-server");
 
   const channel = sb.channel(`kartuduel-room-${code}`, {
-    config: { broadcast: { self: false, ack: false }, presence: { key: `${role}-${crypto.randomUUID()}` } },
+    // A stable key per tab, so a reload rejoins as the same player rather than a second one.
+    config: { broadcast: { self: false, ack: false }, presence: { key: `${role}-${presenceId()}` } },
   });
   const messageFns = new Set<(msg: NetMessage) => void>();
   const presenceFns = new Set<(gone: boolean) => void>();
@@ -155,6 +163,15 @@ async function openChannel(code: string, role: Role): Promise<{ channel: Realtim
   return { channel, link };
 }
 
+/** Opens an existing room again as its host, after a reload. The guest is already there or will rejoin. */
+export async function rehostRoom(code: string): Promise<Link> {
+  const { link } = await openChannel(code, "host");
+  link.onMessage((msg) => {
+    if (msg.t === "knock") link.send({ t: "here" });
+  });
+  return link;
+}
+
 /** Opens a room and waits for a friend to say hello. */
 export async function hostRoom(code: string, onWaiting: (link: Link) => void): Promise<{ link: Link; hello: Extract<NetMessage, { t: "hello" }> }> {
   const { link } = await openChannel(code, "host");
@@ -183,11 +200,15 @@ export async function joinRoom(code: string, onSearching?: (seconds: number) => 
   let lastKnock = 0;
   try {
     while (Date.now() - started < HOST_WAIT) {
-      const everyone = Object.values(channel.presenceState<Presence>()).flat();
+      // Other guests are other presence keys; our own key may still linger from before a reload.
+      const myKey = `guest-${presenceId()}`;
+      const otherGuests = Object.entries(channel.presenceState<Presence>()).filter(
+        ([key, metas]) => key !== myKey && metas.some((m) => m.role === "guest"),
+      );
       const hostSeen = answered || others(channel, "guest").some((p) => p.role === "host");
       if (hostSeen) {
         // Counting ourselves, more than one guest means someone else got here first.
-        if (everyone.filter((p) => p.role === "guest").length > 1) throw new RoomError("full");
+        if (otherGuests.length > 0) throw new RoomError("full");
         return link;
       }
       if (Date.now() - lastKnock > KNOCK_EVERY) {

@@ -101,7 +101,7 @@ export function findMatch(me: Seeker, onSeconds: (s: number) => void, signal: Ab
         });
         const timeout = new Promise<never>((_, rej) => timers.push(setTimeout(() => rej(new Error("no hello")), HELLO_TIMEOUT)));
         const { link, hello } = await Promise.race([hosting, timeout]);
-        finish({ kind: "human", connected: hostConnected(link, meAsSeeker, hello) });
+        finish({ kind: "human", connected: hostConnected(code, link, meAsSeeker, hello) });
       } catch {
         (room as Link | null)?.close();
         finish(bot());
@@ -113,7 +113,7 @@ export function findMatch(me: Seeker, onSeconds: (s: number) => void, signal: Ab
       try {
         const link = await joinRoom(code);
         send(link, { t: "hello", ...meAsSeeker });
-        finish({ kind: "human", connected: { role: "guest", link } });
+        finish({ kind: "human", connected: { role: "guest", code, link } });
       } catch {
         finish(bot());
       }
