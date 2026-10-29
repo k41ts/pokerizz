@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { chooseBestPlay, chooseDiscard, chooseJoker } from "@/lib/bot";
 import { reportLoss } from "@/lib/account";
 import { createGame, gameReducer, viewFor, type GameAction, type GameState, type PlayerIndex } from "@/lib/game";
-import { send, type Link, type NetMessage } from "@/lib/net";
+import { send, type Link } from "@/lib/net";
 import { play } from "@/lib/sound";
 import Game, { type LocalAction, type RankNote } from "./Game";
 import { PrimaryButton } from "./ui";
@@ -132,26 +132,31 @@ function useLinkStatus(link: Link): LinkStatus {
       gone = true;
       setStatus("gone");
     };
-    const onData = (raw: unknown) => {
+    const offMessage = link.onMessage((msg) => {
       lastSeen = Date.now();
-      if ((raw as NetMessage).t === "bye") drop();
+      if (msg.t === "bye") drop();
       else if (!gone) setStatus("ok");
-    };
+    });
+    // A dropped websocket shows up as presence leaving; it usually comes back by itself.
+    const offPresence = link.onPresence((away) => {
+      if (gone) return;
+      if (away) setStatus("quiet");
+      else {
+        lastSeen = Date.now();
+        setStatus("ok");
+      }
+    });
     const timer = setInterval(() => {
       send(link, { t: "ping" });
       if (!gone && Date.now() - lastSeen > QUIET_AFTER) setStatus("quiet");
     }, PING_EVERY);
     const bye = () => send(link, { t: "bye" });
 
-    link.conn.on("data", onData);
-    link.conn.on("close", drop);
-    link.conn.on("error", drop);
     window.addEventListener("pagehide", bye);
     return () => {
       clearInterval(timer);
-      link.conn.off("data", onData);
-      link.conn.off("close", drop);
-      link.conn.off("error", drop);
+      offMessage();
+      offPresence();
       window.removeEventListener("pagehide", bye);
     };
   }, [link]);
@@ -186,17 +191,30 @@ export function HostMatch({
     send(link, { t: "meta", matchId, userIds });
   }, [link, matchId, userIds]);
 
+  // Latest values for resending when the guest asks for a sync.
+  const latest = useRef({ state, matchId });
   useEffect(() => {
-    const onData = (raw: unknown) => {
-      const msg = raw as NetMessage;
+    latest.current = { state, matchId };
+  });
+
+  useEffect(() => {
+    const resync = () => {
+      send(link, { t: "meta", matchId: latest.current.matchId, userIds });
+      send(link, { t: "state", state: viewFor(latest.current.state, 1) });
+    };
+    const offMessage = link.onMessage((msg) => {
       if (msg.t === "action") dispatch({ ...msg.action, player: 1 } as GameAction);
       if (msg.t === "rematch") restart();
-    };
-    link.conn.on("data", onData);
+      if (msg.t === "sync") resync();
+    });
+    const offPresence = link.onPresence((away) => {
+      if (!away) resync();
+    });
     return () => {
-      link.conn.off("data", onData);
+      offMessage();
+      offPresence();
     };
-  }, [link, restart]);
+  }, [link, restart, userIds]);
 
   useEffect(() => {
     send(link, { t: "state", state: viewFor(state, 1) });
@@ -226,8 +244,7 @@ export function GuestMatch({ link, onExit, onRanked }: { link: Link; onExit: () 
   const firstState = useRef(true);
 
   useEffect(() => {
-    const onData = (raw: unknown) => {
-      const msg = raw as NetMessage;
+    const off = link.onMessage((msg) => {
       if (msg.t === "state") {
         if (firstState.current) {
           firstState.current = false;
@@ -236,10 +253,13 @@ export function GuestMatch({ link, onExit, onRanked }: { link: Link; onExit: () 
         setView(msg.state);
       }
       if (msg.t === "meta") setMeta({ matchId: msg.matchId, userIds: msg.userIds });
-    };
-    link.conn.on("data", onData);
+    });
+    send(link, { t: "sync" });
+    // Ask again if the first answer got lost.
+    const retry = setInterval(() => firstState.current && send(link, { t: "sync" }), 2500);
     return () => {
-      link.conn.off("data", onData);
+      off();
+      clearInterval(retry);
     };
   }, [link]);
 

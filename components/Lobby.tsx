@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { describeError, hostRoom, joinRoom, makeRoomCode, normalizeCode, send, type Link, type NetMessage } from "@/lib/net";
+import { describeError, hostRoom, joinRoom, makeRoomCode, normalizeCode, send, type Link } from "@/lib/net";
 import { play } from "@/lib/sound";
 import { ArrowIcon, PrimaryButton, SecondaryButton } from "./ui";
 
@@ -33,7 +33,7 @@ export default function Lobby({ name, userId, onConnected, onBack }: Props) {
   // Close the half-open peer if the player leaves the lobby.
   useEffect(
     () => () => {
-      if (!done.current) linkRef.current?.peer.destroy();
+      if (!done.current) linkRef.current?.close();
     },
     [],
   );
@@ -43,15 +43,13 @@ export default function Lobby({ name, userId, onConnected, onBack }: Props) {
     const roomCode = makeRoomCode();
     setStep({ kind: "hosting", code: roomCode, ready: false });
     try {
-      const link = await hostRoom(roomCode, () => setStep({ kind: "hosting", code: roomCode, ready: true }));
-      linkRef.current = link;
-      link.conn.once("data", (raw) => {
-        const msg = raw as NetMessage;
-        const hello = msg.t === "hello" ? msg : null;
-        play("connect");
-        done.current = true;
-        onConnected({ role: "host", link, names: [name, hello?.name ?? "Teman"], userIds: [userId, hello?.userId ?? null] });
+      const { link, hello } = await hostRoom(roomCode, (open) => {
+        linkRef.current = open;
+        setStep({ kind: "hosting", code: roomCode, ready: true });
       });
+      play("connect");
+      done.current = true;
+      onConnected({ role: "host", link, names: [name, hello.name || "Teman"], userIds: [userId, hello.userId] });
     } catch (err) {
       setError(describeError(err));
       setStep({ kind: "choose" });

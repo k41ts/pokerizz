@@ -65,7 +65,7 @@ export default function Home() {
       const { link } = screen;
       send(link, { t: "bye" });
       // Give the goodbye a moment to leave before closing the channel.
-      setTimeout(() => link.peer.destroy(), 300);
+      setTimeout(() => link.close(), 300);
     }
     setScreen({ kind: "menu" });
   };

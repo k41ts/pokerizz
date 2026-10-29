@@ -1,6 +1,7 @@
 "use client";
 
-import type { DataConnection, Peer as PeerType } from "peerjs";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "./account";
 import type { GameAction, GameState } from "./game";
 
 /** Messages between the two browsers. The host runs the game; the guest only sends actions. */
@@ -11,13 +12,19 @@ export type NetMessage =
   | { t: "state"; state: GameState }
   | { t: "action"; action: GameAction }
   | { t: "rematch" }
-  /** Heartbeat: WebRTC can take a long time to notice a closed tab on its own. */
+  /** Guest asks the host to resend meta and state (after joining or reconnecting). */
+  | { t: "sync" }
+  /** Heartbeat, so a player whose phone went to sleep shows up as "not connected". */
   | { t: "ping" }
   | { t: "bye" };
 
-const PREFIX = "kartuduel-v2-";
+type Role = "host" | "guest";
+
 // No 0/O/1/I so codes are easy to read out loud.
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const JOIN_TIMEOUT = 10000;
+/** How long a guest looks for the host before saying the room doesn't exist. */
+const HOST_WAIT = 6000;
 
 export function makeRoomCode(): string {
   let code = "";
@@ -29,67 +36,136 @@ export function normalizeCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
 }
 
-async function newPeer(id?: string): Promise<PeerType> {
-  // PeerJS touches window on import, so load it only in the browser.
-  const { Peer } = await import("peerjs");
-  return new Promise((resolve, reject) => {
-    const peer = id ? new Peer(id) : new Peer();
-    peer.once("open", () => resolve(peer));
-    peer.once("error", (err) => {
-      peer.destroy();
-      reject(err);
-    });
-  });
-}
-
+/**
+ * A room is a Supabase Realtime channel. Messages go through Supabase's servers over a
+ * websocket, so it works on any network (mobile data, strict Wi-Fi), unlike direct WebRTC.
+ */
 export interface Link {
-  peer: PeerType;
-  conn: DataConnection;
+  send(msg: NetMessage): void;
+  onMessage(fn: (msg: NetMessage) => void): () => void;
+  /** The other player's connection dropped (true) or came back (false). */
+  onPresence(fn: (gone: boolean) => void): () => void;
+  close(): void;
 }
 
-/** Opens a room and waits for one friend to join. */
-export async function hostRoom(code: string, onWaiting: () => void): Promise<Link> {
-  const peer = await newPeer(PREFIX + code);
-  onWaiting();
+export class RoomError extends Error {
+  constructor(public kind: "no-server" | "network" | "not-found" | "full") {
+    super(kind);
+  }
+}
+
+interface Presence {
+  role: Role;
+}
+
+function others(channel: RealtimeChannel, role: Role): Presence[] {
+  return Object.values(channel.presenceState<Presence>())
+    .flat()
+    .filter((p) => p.role !== role);
+}
+
+async function openChannel(code: string, role: Role): Promise<{ channel: RealtimeChannel; link: Link }> {
+  const sb = supabase();
+  if (!sb) throw new RoomError("no-server");
+
+  const channel = sb.channel(`kartuduel-room-${code}`, {
+    config: { broadcast: { self: false, ack: false }, presence: { key: `${role}-${crypto.randomUUID()}` } },
+  });
+  const messageFns = new Set<(msg: NetMessage) => void>();
+  const presenceFns = new Set<(gone: boolean) => void>();
+  let closed = false;
+
+  channel.on("broadcast", { event: "msg" }, ({ payload }) => {
+    const { from, msg } = payload as { from: Role; msg: NetMessage };
+    if (from !== role) messageFns.forEach((fn) => fn(msg));
+  });
+  channel.on("presence", { event: "join" }, ({ newPresences }) => {
+    if ((newPresences as unknown as Presence[]).some((p) => p.role !== role)) presenceFns.forEach((fn) => fn(false));
+  });
+  channel.on("presence", { event: "leave" }, ({ leftPresences }) => {
+    if ((leftPresences as unknown as Presence[]).some((p) => p.role !== role)) presenceFns.forEach((fn) => fn(true));
+  });
+
+  const link: Link = {
+    send(msg) {
+      if (!closed) void channel.send({ type: "broadcast", event: "msg", payload: { from: role, msg } });
+    },
+    onMessage(fn) {
+      messageFns.add(fn);
+      return () => messageFns.delete(fn);
+    },
+    onPresence(fn) {
+      presenceFns.add(fn);
+      return () => presenceFns.delete(fn);
+    },
+    close() {
+      if (closed) return;
+      closed = true;
+      void channel.untrack().finally(() => sb.removeChannel(channel));
+    },
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new RoomError("network")), JOIN_TIMEOUT);
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        clearTimeout(timer);
+        resolve();
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        clearTimeout(timer);
+        reject(new RoomError("network"));
+      }
+    });
+  }).catch((err) => {
+    link.close();
+    throw err;
+  });
+  await channel.track({ role } satisfies Presence);
+  return { channel, link };
+}
+
+/** Opens a room and waits for a friend to say hello. */
+export async function hostRoom(code: string, onWaiting: (link: Link) => void): Promise<{ link: Link; hello: Extract<NetMessage, { t: "hello" }> }> {
+  const { link } = await openChannel(code, "host");
+  onWaiting(link);
   return new Promise((resolve) => {
-    peer.on("connection", (conn) => {
-      conn.once("open", () => resolve({ peer, conn }));
+    const off = link.onMessage((msg) => {
+      if (msg.t !== "hello") return;
+      off();
+      resolve({ link, hello: msg });
     });
   });
 }
 
+/** Joins a room once its host is seen in the channel. */
 export async function joinRoom(code: string): Promise<Link> {
-  const peer = await newPeer();
-  return new Promise((resolve, reject) => {
-    const conn = peer.connect(PREFIX + code, { reliable: true });
-    const timer = setTimeout(() => {
-      peer.destroy();
-      reject(new Error("timeout"));
-    }, 12000);
-    conn.once("open", () => {
-      clearTimeout(timer);
-      resolve({ peer, conn });
-    });
-    peer.once("error", (err) => {
-      clearTimeout(timer);
-      peer.destroy();
-      reject(err);
-    });
-  });
+  const { channel, link } = await openChannel(code, "guest");
+  const started = Date.now();
+  while (Date.now() - started < HOST_WAIT) {
+    const present = others(channel, "guest");
+    // Another guest is anything that isn't us or the host.
+    const guests = Object.values(channel.presenceState<Presence>()).flat().filter((p) => p.role === "guest");
+    if (present.some((p) => p.role === "host")) {
+      if (guests.length > 1) {
+        link.close();
+        throw new RoomError("full");
+      }
+      return link;
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  link.close();
+  throw new RoomError("not-found");
 }
 
 export function send(link: Link, msg: NetMessage) {
-  if (link.conn.open) link.conn.send(msg);
+  link.send(msg);
 }
 
-/** Turns PeerJS error types into a sentence for the lobby. */
 export function describeError(err: unknown): string {
-  const type = (err as { type?: string })?.type;
-  if (type === "unavailable-id") return "Kode room itu lagi dipakai. Coba bikin room lagi.";
-  if (type === "peer-unavailable" || (err as Error)?.message === "timeout")
-    return "Room ga ketemu. Cek lagi kodenya, dan pastiin temenmu masih di layar room.";
-  if (type === "network" || type === "server-error" || type === "socket-error")
-    return "Ga bisa nyambung ke server room. Cek koneksi internet, lalu coba lagi.";
-  if (type === "browser-incompatible") return "Browser ini ga dukung main online. Coba Chrome atau Firefox terbaru.";
-  return "Koneksi gagal. Coba lagi.";
+  const kind = err instanceof RoomError ? err.kind : null;
+  if (kind === "not-found") return "Room ga ketemu. Cek lagi kodenya, dan pastiin temenmu masih di layar room.";
+  if (kind === "full") return "Room itu udah ada dua pemain. Minta kode room baru.";
+  if (kind === "no-server") return "Main online belum tersedia di server ini.";
+  return "Ga bisa nyambung ke server room. Cek koneksi internet, lalu coba lagi.";
 }

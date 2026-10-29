@@ -15,9 +15,10 @@ Kartu 2–9 sesuai angkanya, 10/J/Q/K = 10, As = 11. Contoh: 10 10 K K = 40 + Tw
 
 ## Main online
 
-Pakai WebRTC peer-to-peer lewat [PeerJS](https://peerjs.com): satu orang bikin room dan dapat kode 5 huruf, yang lain gabung pakai kode itu.
+Room online pakai [Supabase Realtime](https://supabase.com/docs/guides/realtime) (broadcast + presence): satu orang bikin room dan dapat kode 5 huruf, yang lain gabung pakai kode itu.
+Semua pesan lewat server Supabase pakai websocket, jadi tetap jalan di data seluler atau Wi-Fi yang ketat.
 Host yang menjalankan game; device tamu cuma dikirimi kartunya sendiri, jadi kartu lawan ga bisa diintip sebelum dibuka.
-Pertemuan awal pakai server publik PeerJS (0.peerjs.com). Di beberapa jaringan kantor/kampus yang ketat, koneksi langsung bisa gagal karena ga ada TURN server.
+Main online butuh env Supabase di bawah.
 
 ## Akun dan rank
 
@@ -45,7 +46,7 @@ Tanpa env ini, game tetap jalan, cuma tanpa akun dan rank.
 - `lib/scoring.ts`: skor akhir dan hitungan damage
 - `lib/game.ts`: reducer (giliran barengan, discard, reveal, Joker, game over) dan `viewFor` yang nyembunyiin kartu lawan
 - `lib/bot.ts`: AI bot
-- `lib/net.ts`: room online (PeerJS)
+- `lib/net.ts`: room online (Supabase Realtime)
 - `lib/sound.ts`: efek suara, disintesis pakai Web Audio (tanpa file audio)
 - `lib/account.ts`: akun, profil, papan peringkat, rank (Supabase)
 - `components/`: tampilan; `CardArt.tsx` gambar kartu (SVG), `Arena.tsx` animasi reveal, `Tutorial.tsx`, `ComboGuide.tsx`
