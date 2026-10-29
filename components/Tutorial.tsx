@@ -128,7 +128,7 @@ function ClashDemo() {
   const step = useLoop(3, 1300);
   return (
     <div className="flex w-full max-w-sm flex-col items-center gap-3">
-      <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
+      <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
         <div className="rounded-2xl bg-paper p-4 text-ink">
           <p className="text-sm text-ink/60">Kamu</p>
           <p className="font-display text-3xl">70</p>
@@ -184,7 +184,7 @@ const SLIDES = [
   },
   {
     title: "Pilih kartu",
-    body: "Tiap ronde kamu pegang 8 kartu. Ketuk 1–5 kartu buat bikin kombinasi poker. Kenali sendiri kombinasimu, ga ada yang ngasih tahu. Di Cari lawan cuma ada 10 detik tiap ronde.",
+    body: "Tiap ronde kamu pegang 8 kartu. Ketuk 1–5 kartu buat bikin kombinasi poker. Begitu kartu yang kamu pilih bentuk kombinasi, namanya muncul. Di Cari lawan ada 20 detik tiap ronde.",
     Demo: PickDemo,
   },
   {

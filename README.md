@@ -25,7 +25,7 @@ Main online butuh env Supabase di bawah.
 Pemain yang lagi nyari masuk antrian Supabase Realtime. Yang paling lama nunggu jadi host dan dipasangin sama pemain berikutnya.
 Kalau dalam 8–12 detik ga ada orang, lawannya bot dengan nama acak, levelnya ngikutin rank pemain (Pemula sampai Berlian).
 Bot Emas dan Berlian milih buangan kartu dengan simulasi kemungkinan kartu yang bakal ditarik (ga ngintip deck).
-Tiap ronde ada waktu 10 detik; kalau habis, kartu yang dipilih otomatis dimainin (atau 1 kartu acak). Latihan lawan bot ga pakai timer.
+Tiap ronde ada waktu 20 detik; kalau habis, kartu yang dipilih otomatis dimainin (atau 1 kartu acak). Latihan lawan bot ga pakai timer.
 
 ## Akun, rank, dan skin
 

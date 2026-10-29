@@ -55,7 +55,7 @@ export default function JokerPicker({ player, offers, done, opponentDone, onPick
         </Pill>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {offers.map((id, i) => {
           const j = JOKERS[id];
           const isChosen = chosen === id;

@@ -160,7 +160,7 @@ export default function Menu({
         </div>
       </header>
 
-      <section className="grid items-center gap-6 rounded-[32px] bg-paper p-5 sm:p-8 md:grid-cols-[1.1fr_1fr]">
+      <section className="grid grid-cols-1 items-center gap-6 rounded-[32px] bg-paper p-5 sm:p-8 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-5">
           <div>
             <h1 className="font-display text-[clamp(1.7rem,5vw,2.8rem)] leading-[1.1]">Adu kartu poker, habisi HP lawan.</h1>
@@ -184,7 +184,8 @@ export default function Menu({
                 value={name}
                 maxLength={14}
                 onChange={(e) => onName(e.target.value)}
-                className="min-w-0 flex-1 rounded-full bg-panel px-4 py-2.5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-signal"
+                size={1}
+                className="w-0 min-w-0 flex-1 rounded-full bg-panel px-4 py-2.5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-signal"
               />
             </label>
           )}
@@ -195,7 +196,7 @@ export default function Menu({
       </section>
 
       {accountsAvailable && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <section className="flex flex-col justify-between gap-4 rounded-[28px] bg-ink p-5 text-paper sm:p-6">
             {profile ? (
               <>
@@ -253,7 +254,7 @@ export default function Menu({
           Daftar Joker
           <span className="text-2xl transition-transform duration-200 group-open:rotate-45">+</span>
         </summary>
-        <ul className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {JOKER_IDS.map((id) => (
             <li key={id} className="flex items-start gap-3 rounded-2xl bg-panel p-3">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-paper text-xl" aria-hidden>

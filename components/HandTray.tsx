@@ -1,9 +1,10 @@
 "use client";
 
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { SUITS, sortHand, type Card } from "@/lib/cards";
 import { MAX_SELECT, type PlayerState } from "@/lib/game";
+import { evaluateHand, HAND_INFO } from "@/lib/hands";
 import { play } from "@/lib/sound";
 import PlayingCard from "./PlayingCard";
 import { PrimaryButton, SecondaryButton } from "./ui";
@@ -70,6 +71,15 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
 
   const sel = selected.filter((id) => player.hand.some((c) => c.id === id));
   const cards = sortBy === "rank" ? sortHand(player.hand) : sortBySuit(player.hand);
+  // Name the combination once the selection actually forms one (no score, no hints).
+  const selectedCards = player.hand.filter((c) => sel.includes(c.id));
+  const hand = selectedCards.length > 0 ? evaluateHand(selectedCards)?.type : undefined;
+  const combo = hand && hand !== "high_card" ? hand : null;
+  const lastCombo = useRef<string | null>(null);
+  useEffect(() => {
+    if (combo && combo !== lastCombo.current) play("stamp");
+    lastCombo.current = combo;
+  }, [combo]);
 
   const left = useCountdown(turnSeconds, () => {
     // Out of time: play what's selected, or one random card.
@@ -101,9 +111,26 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
         </div>
       )}
       <div className="mb-2 flex items-center justify-between gap-2 sm:mb-4 sm:gap-3">
-        <p className="text-sm text-ink/70 sm:text-base">
-          Pilih 1–{MAX_SELECT} kartu. <span className="font-semibold text-ink">{sel.length} dipilih</span>
-        </p>
+        <div className="flex min-h-9 min-w-0 items-center gap-2">
+          <AnimatePresence mode="wait" initial={false}>
+            {combo ? (
+              <motion.span
+                key={combo}
+                className="truncate rounded-full bg-ink px-3.5 py-1.5 font-display text-sm text-paper sm:text-base"
+                initial={{ opacity: 0, transform: "scale(1.3) rotate(-4deg)" }}
+                animate={{ opacity: 1, transform: "scale(1) rotate(0deg)" }}
+                exit={{ opacity: 0, transform: "scale(0.9)" }}
+                transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+              >
+                {HAND_INFO[combo].label}
+              </motion.span>
+            ) : (
+              <motion.p key="hint" className="text-sm text-ink/70 sm:text-base" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                Pilih 1–{MAX_SELECT} kartu. <span className="font-semibold text-ink">{sel.length} dipilih</span>
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
         {turnSeconds && (
           <p
             className={`flex shrink-0 items-baseline gap-1 font-display tabular-nums ${urgent ? "animate-pulse-dot text-signal" : ""}`}
@@ -125,14 +152,20 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
         </AnimatePresence>
       </div>
 
-      <div className="sticky bottom-0 z-20 -mx-3 mt-3 flex items-center justify-between gap-2 rounded-b-[22px] bg-paper/95 px-3 py-3 backdrop-blur sm:static sm:mx-0 sm:mt-4 sm:flex-wrap sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-        <SecondaryButton onClick={() => setSortBy(sortBy === "rank" ? "suit" : "rank")} className="whitespace-nowrap max-sm:px-3.5">
-          <span className="max-sm:hidden">Urut: </span>
-          {sortBy === "rank" ? "Angka" : "Simbol"}
+      <div className="sticky bottom-0 z-20 -mx-3 mt-3 flex items-center gap-2 rounded-b-[22px] bg-paper/95 px-3 py-3 backdrop-blur sm:static sm:mx-0 sm:mt-4 sm:justify-between sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <SecondaryButton
+          onClick={() => setSortBy(sortBy === "rank" ? "suit" : "rank")}
+          aria-label={`Urutkan per ${sortBy === "rank" ? "simbol" : "angka"}`}
+          className="shrink-0 whitespace-nowrap max-sm:px-3"
+        >
+          <span className="sm:hidden" aria-hidden>
+            {sortBy === "rank" ? "A↓" : "♠♥"}
+          </span>
+          <span className="max-sm:hidden">Urut: {sortBy === "rank" ? "Angka" : "Simbol"}</span>
         </SecondaryButton>
-        <div className="flex gap-2">
+        <div className="flex min-w-0 flex-1 gap-2 sm:flex-none">
           <SecondaryButton
-            className="whitespace-nowrap max-sm:px-3.5"
+            className="min-w-0 flex-1 whitespace-nowrap max-sm:px-2 sm:flex-none"
             disabled={sel.length === 0 || player.discardsLeft <= 0}
             onClick={() => {
               play("discard");
@@ -144,7 +177,7 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
           </SecondaryButton>
           <PrimaryButton
             tone="red"
-            className="whitespace-nowrap"
+            className="min-w-0 flex-1 justify-between whitespace-nowrap sm:flex-none"
             disabled={sel.length === 0}
             onClick={() => {
               play("play");

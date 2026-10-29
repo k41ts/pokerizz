@@ -22,7 +22,7 @@ export default function ComboGuide({ compact }: { compact?: boolean }) {
       <p className="text-sm text-ink/70 sm:text-base">
         Skor = nilai kombinasi + nilai semua kartu yang kamu mainkan, termasuk kartu tambahan di luar kombinasi. Kartu 2–9 sesuai angka, 10/J/Q/K bernilai 10, As bernilai 11. Jadi isi sampai 5 kartu biar skornya maksimal.
       </p>
-      <ol className={`grid gap-2 ${compact ? "" : "md:grid-cols-2"}`}>
+      <ol className={`grid grid-cols-1 gap-2 ${compact ? "" : "md:grid-cols-2"}`}>
         {HAND_TYPES.map((h, i) => {
           const ex = EXAMPLES[h];
           const total = scorePlay(ex.cards, [])!.total;

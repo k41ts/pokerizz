@@ -75,15 +75,18 @@ export function SecondaryButton({
   onClick,
   disabled,
   className = "",
+  "aria-label": ariaLabel,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
+  "aria-label"?: string;
 }) {
   return (
     <button
       type="button"
+      aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => {
         play("click");

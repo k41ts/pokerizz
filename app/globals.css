@@ -52,6 +52,9 @@
 
 html {
   color-scheme: light;
+  /* Stop mobile browsers from enlarging text on their own (font boosting). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {

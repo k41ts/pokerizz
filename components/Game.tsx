@@ -21,7 +21,7 @@ export type LocalAction =
   | { type: "pickJoker"; jokerId: JokerId | null; replaceIndex?: number };
 
 /** Seconds to pick cards in ranked and online games. The round banner gets one more. */
-export const TURN_SECONDS = 10;
+export const TURN_SECONDS = 20;
 
 export interface RankNote {
   kind: "star" | "loss" | "unranked";
@@ -131,7 +131,7 @@ export default function Game({
         {banner}
         {phase.kind === "turn" && <RoundBanner key={round} round={round} />}
 
-        <div className="grid gap-2 sm:gap-3 lg:grid-cols-[minmax(280px,340px)_1fr]">
+        <div className="grid grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
           <div className="flex flex-col gap-3 max-lg:contents">
             <div className="max-lg:order-1">
               <PlayerPanel player={players[them]} hp={hpOf(them)} isYou={false} status={status(them)} impact={impactOf(them)} />
