@@ -64,7 +64,7 @@ $$;
 -- Ranked games against a matchmaking bot: win +1 star, loss -1 (never below 0).
 -- The game runs on the player's device, so the server can't verify the result; these
 -- rules only slow down abuse: a match must be started first, last at least 20 seconds,
--- be reported once, and a player gets at most 30 per day.
+-- be reported once, and a player gets at most 100 per day.
 create table public.bot_matches (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles (id) on delete cascade,
@@ -97,7 +97,7 @@ begin
     raise exception 'not signed in';
   end if;
   if (select count(*) from public.bot_matches
-      where user_id = v_user and started_at > now() - interval '1 day') >= 30 then
+      where user_id = v_user and started_at > now() - interval '1 day') >= 100 then
     return null;
   end if;
   insert into public.bot_matches (user_id, bot_level) values (v_user, p_level) returning id into v_id;
