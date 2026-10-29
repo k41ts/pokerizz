@@ -12,7 +12,8 @@ import HandFx, { FX_HOLD } from "./HandFx";
 import PlayingCard from "./PlayingCard";
 import { AnimatedNumber, Pill, PrimaryButton } from "./ui";
 
-const CARD_W = "w-[18.5%] max-w-[84px]";
+// On desktop, card size also follows screen height so short laptop screens never clip the table.
+const CARD_W = "w-[18.5%] max-w-[84px] lg:max-w-[min(130px,11dvh)]";
 
 function Slots({ text }: { text: string }) {
   return (
@@ -28,7 +29,7 @@ function Slots({ text }: { text: string }) {
 }
 
 /** Locked cards during a turn: small on phones so the hand below stays on screen. */
-const ROW_W = "w-[12%] max-w-[46px] sm:w-[18.5%] sm:max-w-[84px]";
+const ROW_W = "w-[12%] max-w-[46px] sm:w-[18.5%] sm:max-w-[84px] lg:max-w-[min(96px,9dvh)]";
 
 function Row({ cards, faceDown, layout }: { cards: Card[]; faceDown?: boolean; layout?: boolean }) {
   return (
@@ -342,7 +343,7 @@ export default function Arena({ view, me, skins, onImpact, onContinue }: ArenaPr
   }, [onImpact, result, reduce]);
 
   return (
-    <section ref={ref} className="relative flex sm:min-h-[260px] flex-col justify-center overflow-hidden rounded-[22px] p-3 text-paper sm:rounded-[28px] sm:p-5" style={{ background: skinById(skins[me]).board }}>
+    <section ref={ref} className="relative flex sm:min-h-[260px] flex-col justify-center overflow-hidden lg:flex-1 rounded-[22px] p-3 text-paper sm:rounded-[28px] sm:p-5" style={{ background: skinById(skins[me]).board }}>
       <svg className="pointer-events-none absolute -right-24 -bottom-24 size-80 text-paper/[0.06]" viewBox="0 0 100 100" aria-hidden>
         <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" />
         <circle cx="50" cy="50" r="34" fill="none" stroke="currentColor" strokeDasharray="2 3" />

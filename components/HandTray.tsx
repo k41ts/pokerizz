@@ -144,7 +144,7 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
         )}
       </div>
 
-      <div className="grid grid-cols-4 gap-2.5 pt-3 sm:grid-cols-8 sm:gap-2 sm:pt-4">
+      <div className="mx-auto grid w-full grid-cols-4 gap-2.5 pt-3 sm:grid-cols-8 sm:gap-2 sm:pt-4 lg:max-w-[min(880px,90dvh)]">
         <AnimatePresence mode="popLayout">
           {cards.map((c, i) => (
             <PlayingCard key={c.id} layoutId={c.id} card={c} index={i} selected={sel.includes(c.id)} onClick={() => toggle(c.id)} />

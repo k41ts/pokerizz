@@ -119,7 +119,7 @@ export default function Game({
 
   return (
     <LayoutGroup>
-      <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-2 p-2.5 sm:gap-3 sm:p-5">
+      <main className="mx-auto flex min-h-dvh w-full max-w-[1800px] flex-col gap-2 p-2.5 sm:gap-3 sm:p-5 lg:h-dvh">
         <header className="flex items-center justify-between gap-1.5 rounded-full bg-panel p-1.5 sm:gap-2 sm:pr-2">
           <Logo />
           <div className="flex items-center gap-1.5">
@@ -140,8 +140,8 @@ export default function Game({
         {phase.kind === "turn" && <RoundBanner key={round} round={round} />}
         {burst > 0 && <PlayBurst key={burst} skin={mySkin} />}
 
-        <div className="grid grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
-          <div className="flex flex-col gap-3 max-lg:contents">
+        <div className="grid grid-cols-1 gap-2 sm:gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
+          <div className="flex flex-col gap-3 max-lg:contents lg:justify-between">
             <div className="max-lg:order-1">
               <PlayerPanel player={players[them]} hp={hpOf(them)} isYou={false} status={status(them)} impact={impactOf(them)} />
             </div>
@@ -149,8 +149,8 @@ export default function Game({
               <PlayerPanel player={players[me]} hp={hpOf(me)} isYou status={status(me)} impact={impactOf(me)} />
             </div>
           </div>
-          <div className="flex flex-col gap-3 max-lg:contents">
-            <div className="max-lg:order-2">
+          <div className="flex flex-col gap-3 max-lg:contents lg:min-h-0">
+            <div className="max-lg:order-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
               {phase.kind === "jokerPick" ? (
                 <JokerPicker
                   key={round}
