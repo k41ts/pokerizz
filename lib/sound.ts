@@ -32,6 +32,7 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noiseBuffer: AudioBuffer | null = null;
 let echo: DelayNode | null = null;
+let hall: ConvolverNode | null = null;
 let muted = readMuted();
 const listeners = new Set<(muted: boolean) => void>();
 
@@ -62,6 +63,28 @@ export function onMuteChange(fn: (muted: boolean) => void) {
   return () => listeners.delete(fn);
 }
 
+/** Stereo impulse of decaying noise: a large, dark room. */
+function hallImpulse(ac: AudioContext, seconds: number): AudioBuffer {
+  const length = Math.floor(ac.sampleRate * seconds);
+  const buffer = ac.createBuffer(2, length, ac.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buffer.getChannelData(ch);
+    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.6);
+  }
+  return buffer;
+}
+
+/** Soft-clipping curve; adds harmonics so low notes still read on small speakers. */
+function driveCurve(amount: number): Float32Array<ArrayBuffer> {
+  const n = 1024;
+  const curve = new Float32Array(new ArrayBuffer(n * 4));
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = ((1 + amount) * x) / (1 + amount * Math.abs(x));
+  }
+  return curve;
+}
+
 function audio(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!ctx) {
@@ -79,6 +102,11 @@ function audio(): AudioContext | null {
     feedback.gain.value = 0.38;
     echo.connect(feedback).connect(echo);
     echo.connect(master);
+    hall = ctx.createConvolver();
+    hall.buffer = hallImpulse(ctx, 3.2);
+    const hallLevel = ctx.createGain();
+    hallLevel.gain.value = 0.9;
+    hall.connect(hallLevel).connect(master);
     noiseBuffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = noiseBuffer.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -165,6 +193,127 @@ function noise(ac: AudioContext, { start = 0, dur, vol = 0.3, filter = "bandpass
   src.stop(t + dur + 0.02);
 }
 
+/* ---------- Cinematic blocks (used by Void) ---------- */
+
+function toHall(node: AudioNode, amount: number) {
+  if (!hall || !ctx) return;
+  const send = ctx.createGain();
+  send.gain.value = amount;
+  node.connect(send).connect(hall);
+}
+
+/** Trailer "braam": stacked, detuned, overdriven saws with a filter that blooms then closes. */
+function braam(ac: AudioContext, root: number, start = 0, dur = 1.4, vol = 0.22) {
+  const t = ac.currentTime + start;
+  const drive = ac.createWaveShaper();
+  drive.curve = driveCurve(14);
+  const lp = ac.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.Q.value = 3;
+  lp.frequency.setValueAtTime(180, t);
+  lp.frequency.exponentialRampToValueAtTime(2600, t + 0.14);
+  lp.frequency.exponentialRampToValueAtTime(260, t + dur);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(vol, t + 0.05);
+  gain.gain.exponentialRampToValueAtTime(vol * 0.6, t + dur * 0.5);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  for (const mult of [1, 1.5, 2, 3]) {
+    for (const det of [-14, 0, 14]) {
+      const osc = ac.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.value = root * mult;
+      osc.detune.value = det;
+      osc.connect(drive);
+      osc.start(t);
+      osc.stop(t + dur + 0.05);
+    }
+  }
+  drive.connect(lp).connect(gain).connect(master!);
+  toHall(gain, 0.6);
+  tone(ac, { freq: root / 2, type: "sine", dur, vol: vol * 1.6, start, attack: 0.02 });
+}
+
+/** A heavy hit: falling sub, crunchy body, and a burst of air. */
+function impact(ac: AudioContext, start = 0, vol = 0.5) {
+  tone(ac, { freq: 160, to: 36, type: "sine", dur: 0.9, vol, start, attack: 0.002 });
+  tone(ac, { freq: 320, to: 80, type: "triangle", dur: 0.35, vol: vol * 0.6, start, attack: 0.002 });
+  noise(ac, { dur: 0.7, vol: vol * 0.8, filter: "lowpass", freq: 3500, to: 120, start });
+  if (ctx && hall) {
+    const g = ac.createGain();
+    g.gain.value = 0;
+    const t = ac.currentTime + start;
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuffer;
+    const bp = ac.createBiquadFilter();
+    bp.type = "lowpass";
+    bp.frequency.value = 1800;
+    g.gain.setValueAtTime(vol * 0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    src.connect(bp).connect(g);
+    toHall(g, 1);
+    src.start(t);
+    src.stop(t + 0.3);
+  }
+}
+
+/** Rising tension: hiss and a pitch that climb into the next hit. */
+function riser(ac: AudioContext, dur: number, start = 0, vol = 0.3) {
+  noise(ac, { dur, vol, freq: 400, to: 6000, q: 0.8, swell: true, start });
+  const t = ac.currentTime + start;
+  const osc = ac.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(110, t);
+  osc.frequency.exponentialRampToValueAtTime(880, t + dur);
+  const lp = ac.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(300, t);
+  lp.frequency.exponentialRampToValueAtTime(4000, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol * 0.35, t + dur * 0.95);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.02);
+  osc.connect(lp).connect(g).connect(master!);
+  toHall(g, 0.4);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+
+/** Dark "aah" choir: detuned saws through vowel formants, swelling in and out. */
+function choir(ac: AudioContext, freqs: number[], start = 0, dur = 2, vol = 0.12) {
+  const t = ac.currentTime + start;
+  const out = ac.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.5, dur * 0.4));
+  out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const f1 = ac.createBiquadFilter();
+  f1.type = "bandpass";
+  f1.frequency.value = 750;
+  f1.Q.value = 3;
+  const f2 = ac.createBiquadFilter();
+  f2.type = "bandpass";
+  f2.frequency.value = 1150;
+  f2.Q.value = 4;
+  const mix = ac.createGain();
+  mix.gain.value = 3;
+  for (const f of freqs) {
+    for (const det of [-10, 0, 10]) {
+      const osc = ac.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.value = f;
+      osc.detune.value = det;
+      osc.connect(f1);
+      osc.connect(f2);
+      osc.start(t);
+      osc.stop(t + dur + 0.05);
+    }
+  }
+  f1.connect(mix);
+  f2.connect(mix);
+  mix.connect(out).connect(master!);
+  toHall(out, 0.9);
+}
+
 /* ---------- Skin voices: each skin swaps in its own take on the card sounds ---------- */
 
 type Voice = Partial<Record<Sfx, (ac: AudioContext, step: number) => void>>;
@@ -186,13 +335,6 @@ const clink = (ac: AudioContext, f: number, start = 0, vol = 0.15) => {
 const saw = (ac: AudioContext, f: number, dur: number, vol: number, start = 0, low = 5000) => {
   tone(ac, { freq: f, type: "sawtooth", dur, vol, start, low, lowTo: 1400, detune: -9 });
   tone(ac, { freq: f, type: "sawtooth", dur, vol, start, low, lowTo: 1400, detune: 9 });
-};
-/** Metal gong: inharmonic partials that ring out. Audible on phone speakers. */
-const gong = (ac: AudioContext, f: number, start = 0, vol = 0.2) => {
-  tone(ac, { freq: f * 2, type: "sine", dur: 1.4, vol, start, attack: 0.004, wet: true });
-  tone(ac, { freq: f * 4.8, type: "sine", dur: 0.9, vol: vol * 0.6, start, attack: 0.004, wet: true });
-  tone(ac, { freq: f * 7.8, type: "sine", dur: 0.5, vol: vol * 0.35, start, attack: 0.004 });
-  tone(ac, { freq: f, type: "triangle", dur: 1.2, vol: vol * 0.8, start, attack: 0.004 });
 };
 const chip8 = (ac: AudioContext, f: number, start = 0, dur = 0.07, vol = 0.11) =>
   tone(ac, { freq: f, type: "square", dur, vol, start, attack: 0.001 });
@@ -312,47 +454,56 @@ const VOICES: Record<SkinId, Voice> = {
   },
   void: {
     select: (ac) => {
-      tone(ac, { freq: 330, to: 262, type: "triangle", dur: 0.14, vol: 0.2, wet: true });
-      tone(ac, { freq: 660, type: "sine", dur: 0.08, vol: 0.06 });
+      tone(ac, { freq: 196, to: 147, type: "triangle", dur: 0.18, vol: 0.28 });
+      noise(ac, { dur: 0.05, vol: 0.18, filter: "highpass", freq: 3000 });
+      tone(ac, { freq: 587, type: "sine", dur: 0.25, vol: 0.06, wet: true });
     },
-    deselect: (ac) => tone(ac, { freq: 247, type: "triangle", dur: 0.1, vol: 0.16 }),
-    deal: (ac) => noise(ac, { dur: 0.06, vol: 0.2, freq: 900, q: 2 }),
+    deselect: (ac) => tone(ac, { freq: 147, to: 110, type: "triangle", dur: 0.16, vol: 0.24 }),
+    deal: (ac) => noise(ac, { dur: 0.14, vol: 0.22, filter: "lowpass", freq: 1400, to: 300 }),
     discard: (ac) => {
-      noise(ac, { dur: 0.4, vol: 0.24, filter: "highpass", freq: 2500, swell: true });
-      tone(ac, { freq: 220, to: 110, type: "triangle", dur: 0.3, vol: 0.14, start: 0.3 });
+      riser(ac, 0.3, 0, 0.22);
+      tone(ac, { freq: 120, to: 50, type: "sine", dur: 0.4, vol: 0.45, start: 0.3 });
     },
     play: (ac) => {
-      // A reversed hiss sucked in, then the hit lands with a ringing gong.
-      noise(ac, { dur: 0.35, vol: 0.32, freq: 1200, to: 3200, q: 0.7, swell: true });
-      gong(ac, 110, 0.33, 0.24);
-      tone(ac, { freq: 140, to: 45, type: "sine", dur: 0.6, vol: 0.5, start: 0.33 });
-      noise(ac, { dur: 0.3, vol: 0.35, filter: "lowpass", freq: 900, start: 0.33 });
+      riser(ac, 0.32, 0, 0.32);
+      impact(ac, 0.32, 0.55);
+      braam(ac, 55, 0.32, 1.3, 0.2);
     },
-    flip: (ac) => tone(ac, { freq: 440, to: 330, type: "triangle", dur: 0.09, vol: 0.15, wet: true }),
+    flip: (ac) => {
+      tone(ac, { freq: 110, to: 70, type: "sine", dur: 0.3, vol: 0.4 });
+      tone(ac, { freq: 1760, type: "sine", dur: 0.4, vol: 0.04, wet: true });
+    },
     chip: (ac, step) => {
-      const f = note(440, MINOR[Math.min(step, MINOR.length - 1)]);
-      tone(ac, { freq: f, type: "triangle", dur: 0.3, vol: 0.17, wet: true });
-      tone(ac, { freq: f * 2, type: "sine", dur: 0.15, vol: 0.06 });
+      const f = note(220, MINOR[Math.min(step, MINOR.length - 1)]);
+      tone(ac, { freq: f, type: "triangle", dur: 0.6, vol: 0.2, wet: true });
+      tone(ac, { freq: f * 2.01, type: "sine", dur: 0.4, vol: 0.08 });
+      tone(ac, { freq: 70, type: "sine", dur: 0.2, vol: 0.3 });
     },
     stamp: (ac) => {
-      gong(ac, 98, 0, 0.2);
-      noise(ac, { dur: 0.12, vol: 0.3, filter: "lowpass", freq: 700 });
+      impact(ac, 0, 0.45);
+      braam(ac, 65.4, 0, 0.8, 0.16);
     },
     combo: (ac, step) => {
-      MINOR.slice(0, 3 + step).forEach((s, i) =>
-        tone(ac, { freq: note(440, s), type: "triangle", dur: 0.32, vol: 0.15, start: i * 0.08, wet: true }),
-      );
       if (step >= 5) {
-        gong(ac, 73.4, 0, 0.3);
-        noise(ac, { dur: 0.5, vol: 0.25, filter: "highpass", freq: 3000, swell: true });
+        riser(ac, 0.5, 0, 0.32);
+        impact(ac, 0.5, 0.6);
+        braam(ac, 49, 0.5, 2.2, 0.24);
+        choir(ac, [220, 261.63, 329.63], 0.5, 2.4, 0.14);
+        return;
       }
+      choir(ac, [220, 261.63, 329.63].slice(0, 2 + Math.min(step, 1)), 0, 1.2, 0.11);
+      tone(ac, { freq: 82, to: 41, type: "sine", dur: 0.6, vol: 0.4 });
     },
-    joker: (ac) =>
-      [0, 3, 7, 10].forEach((s, i) => tone(ac, { freq: note(880, s), type: "sine", dur: 0.4, vol: 0.12, start: i * 0.07, wet: true })),
+    joker: (ac) => {
+      choir(ac, [293.66, 349.23, 440], 0, 1.4, 0.12);
+      tone(ac, { freq: 1174.66, type: "sine", dur: 1, vol: 0.05, wet: true, start: 0.2 });
+    },
     win: (ac) => {
-      [0, 3, 7, 6].forEach((s, i) => tone(ac, { freq: note(440, s), type: "triangle", dur: 1.6, vol: 0.13, start: i * 0.25, wet: true }));
-      gong(ac, 110, 0.2, 0.26);
-      noise(ac, { dur: 0.9, vol: 0.2, filter: "highpass", freq: 4000, swell: true, start: 0.6 });
+      riser(ac, 0.7, 0, 0.32);
+      impact(ac, 0.7, 0.6);
+      braam(ac, 55, 0.7, 1.4, 0.22);
+      braam(ac, 43.65, 1.9, 2, 0.22);
+      choir(ac, [220, 261.63, 329.63, 440], 0.8, 3.2, 0.14);
     },
   },
 };
