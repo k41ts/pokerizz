@@ -207,7 +207,7 @@ function JokerDemo() {
         animate={{ opacity: 1, transform: "perspective(600px) rotateY(0deg)" }}
         transition={{ duration: 0.5, ease: EASE_OUT }}
       >
-        <JokerIcon id="pasangan_setia" className="size-11" />
+        <JokerIcon id="pasangan_setia" className="w-20" />
         <span className="font-display text-sm">{j.name}</span>
         <span className="text-sm text-ink/65">{j.description}</span>
       </motion.div>

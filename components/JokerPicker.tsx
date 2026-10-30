@@ -75,7 +75,7 @@ export default function JokerPicker({ player, offers, done, opponentDone, onPick
                 isChosen ? "shadow-[0_0_0_3px_var(--color-signal)]" : ""
               }`}
             >
-              <JokerIcon id={id} className="size-14" />
+              <JokerIcon id={id} className="w-20 sm:w-28" />
               <span className="flex-1">
                 <span className="block font-display text-sm">{j.name}</span>
                 <span className="mt-1 block text-sm text-ink/65">{j.description}</span>
@@ -104,7 +104,7 @@ export default function JokerPicker({ player, offers, done, opponentDone, onPick
                 onClick={() => pick(chosen, i)}
                 className="press inline-flex items-center gap-2 rounded-full bg-paper/10 py-1.5 pr-4 pl-1.5 text-sm ring-1 ring-paper/25 hover:bg-signal hover:text-snow"
               >
-                <JokerIcon id={id} className="size-7" /> {JOKERS[id].name}
+                <JokerIcon id={id} className="w-6" /> {JOKERS[id].name}
               </button>
             ))}
           </div>

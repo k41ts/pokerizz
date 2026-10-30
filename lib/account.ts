@@ -17,6 +17,8 @@ export interface Profile {
   title: string | null;
   full_houses: number;
   flawless_wins: number;
+  /** Current leaderboard spot (1 = top), or null without stars. Filled in by fetchProfile. */
+  position?: number | null;
 }
 
 const PROFILE_COLUMNS = "id, username, stars, wins, losses, points, skins, skin, titles, title, full_houses, flawless_wins";
@@ -74,8 +76,13 @@ export async function signOut() {
 }
 
 export async function fetchProfile(id: string): Promise<Profile | null> {
-  const { data } = (await supabase()?.from("profiles").select(PROFILE_COLUMNS).eq("id", id).maybeSingle()) ?? {};
-  return (data as Profile | null) ?? null;
+  const sb = supabase();
+  if (!sb) return null;
+  const [{ data }, { data: position }] = await Promise.all([
+    sb.from("profiles").select(PROFILE_COLUMNS).eq("id", id).maybeSingle(),
+    sb.rpc("leaderboard_position", { p_user: id }),
+  ]);
+  return data ? { ...(data as Profile), position: (position as number | null) ?? null } : null;
 }
 
 export async function fetchLeaderboard(limit = 10): Promise<Profile[]> {

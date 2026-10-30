@@ -46,7 +46,7 @@ Akun pakai Supabase Auth (username + password). Cari lawan dan Main sama teman b
 - Menang lawan pemain yang login: +1 bintang, +30 poin. Kalah: −1 bintang (minimal 0), +10 poin. Dicatat lewat `report_loss` dari device yang kalah, maksimal 10 kemenangan per pasangan per hari.
 - Menang lawan bot di Cari lawan: +1 bintang, +30 poin. Kalah: −1 bintang (minimal 0), +10 poin. Match harus didaftarin dulu (`start_bot_match`), minimal 20 detik, sekali lapor, maksimal 100 per hari. Hasilnya dikirim dari device pemain, jadi ini cuma memperlambat kecurangan, bukan mencegah.
 - Poin buat beli skin kartu (`buy_skin`, harga ada di tabel `skin_prices`). Lawan lihat skin kartumu selama main.
-- Title achievement (`lib/titles.ts`): TOP 1 LEADERBOARD (pernah #1), THE KING OF FULL HOUSE (25 Full House), UNTOUCHABLE (menang tanpa kena hit). Statistik dilapor sekali per match lewat `record_match_stats`, title dikasih `claim_titles`, dipasang lewat `equip_title`. Title yang dipakai kelihatan di bawah nama selama main.
+- Title achievement (`lib/titles.ts`): TOP N LEADERBOARD (ngikutin posisi top 3 sekarang, otomatis tampil), THE KING OF FULL HOUSE (25 Full House), UNTOUCHABLE (menang tanpa kena hit). Statistik dilapor sekali per match lewat `record_match_stats`, title dikasih `claim_titles`, dipasang lewat `equip_title`. Title yang dipakai kelihatan di bawah nama selama main.
 
 Setup:
 

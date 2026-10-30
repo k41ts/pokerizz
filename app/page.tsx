@@ -14,6 +14,7 @@ import type { GameState } from "@/lib/game";
 import { describeError, joinRoom, normalizeCode, rehostRoom, send, type Link } from "@/lib/net";
 import { clearMatch, loadMatch } from "@/lib/resume";
 import { setSoundSkin } from "@/lib/sound";
+import { titleFor } from "@/lib/titles";
 
 type Screen =
   | { kind: "menu" }
@@ -136,7 +137,7 @@ export default function Home() {
 
   const displayName = account.profile?.username ?? (name.trim() || "Player");
   const mySkin = account.profile?.skin ?? "classic";
-  const myTitle = account.profile?.title ?? null;
+  const myTitle = titleFor(account.profile);
   // Your skin's voice is the default for every sound you make.
   useEffect(() => setSoundSkin(mySkin), [mySkin]);
   const search = () => setScreen({ kind: "search", id: Date.now() });

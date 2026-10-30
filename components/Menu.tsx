@@ -10,6 +10,7 @@ import { RankBadge } from "./AccountSheet";
 import CardArt from "./CardArt";
 import ComboGuide from "./ComboGuide";
 import JokerIcon from "./JokerIcon";
+import { shownTitle } from "@/lib/titles";
 import { TitleBadge } from "./TitleBadge";
 import { ArrowIcon, Logo, SoundToggle, ThemeToggle } from "./ui";
 
@@ -122,7 +123,7 @@ function Leaderboard({ me }: { me: Profile | null }) {
               <span className="w-6 text-center font-display text-sm">{i + 1}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{p.username}</span>
-                {p.title && <TitleBadge id={p.title} className="mt-0.5" />}
+                {shownTitle(p.title, i + 1) && <TitleBadge id={shownTitle(p.title, i + 1)!} className="mt-0.5" />}
               </span>
               <RankBadge stars={p.stars} className="text-sm" />
             </li>
@@ -266,7 +267,7 @@ export default function Menu({
         <ul className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {JOKER_IDS.map((id) => (
             <li key={id} className="flex items-start gap-3 rounded-2xl bg-panel p-3">
-              <JokerIcon id={id} className="size-10" />
+              <JokerIcon id={id} className="w-14" />
               <span className="text-base">
                 <span className="block font-semibold">{JOKERS[id].name}</span>
                 <span className="text-ink/65">{JOKERS[id].description}</span>

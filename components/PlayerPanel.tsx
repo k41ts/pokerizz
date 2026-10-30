@@ -102,7 +102,7 @@ export default function PlayerPanel({ player, hp, isYou, status, impact, title }
             <span className="flex gap-1" aria-label="Joker">
               {player.jokers.map((id) => (
                 <span key={id} title={`${JOKERS[id].name}: ${JOKERS[id].description}`}>
-                  <JokerIcon id={id} className="size-7" />
+                  <JokerIcon id={id} className="w-6" />
                 </span>
               ))}
             </span>
@@ -134,7 +134,7 @@ export default function PlayerPanel({ player, hp, isYou, status, impact, title }
             return id ? (
               <span key={id} title={JOKERS[id].description}>
                 <Pill tone="dark" className="py-0.5 pl-0.5">
-                  <JokerIcon id={id} className="size-6" /> {JOKERS[id].name}
+                  <JokerIcon id={id} className="w-[18px]" /> {JOKERS[id].name}
                 </Pill>
               </span>
             ) : (

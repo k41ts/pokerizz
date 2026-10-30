@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AccountError, equipTitle, signIn, signOut, signUp, tierFor, type Profile } from "@/lib/account";
-import { FULL_HOUSE_GOAL, TITLE_IDS, TITLES, type TitleId } from "@/lib/titles";
+import { FULL_HOUSE_GOAL, LEADERBOARD_TOP, shownTitle, TITLE_IDS, TITLES, type TitleId } from "@/lib/titles";
 import { play } from "@/lib/sound";
 import Sheet from "./Sheet";
 import { TitleBadge } from "./TitleBadge";
@@ -31,6 +31,7 @@ export function RankBadge({ stars, className = "" }: { stars: number; className?
 
 function progressFor(id: TitleId, profile: Profile): string | null {
   if (id === "king_full_house") return `${Math.min(profile.full_houses, FULL_HOUSE_GOAL)}/${FULL_HOUSE_GOAL} Full Houses`;
+  if (id === "leaderboard") return profile.position ? `You're #${profile.position}.` : "Win a match to get on the board.";
   return null;
 }
 
@@ -46,17 +47,19 @@ function Achievements({ profile, onChanged }: { profile: Profile; onChanged: () 
   return (
     <section className="flex flex-col gap-2">
       <h3 className="font-display text-base">Titles</h3>
-      <p className="text-sm text-ink/60">Wear one and opponents see it under your name in every match.</p>
+      <p className="text-sm text-ink/60">Wear one and opponents see it under your name in every match. Top {LEADERBOARD_TOP} players show their spot automatically.</p>
       <ul className="flex flex-col gap-2">
         {TITLE_IDS.map((id) => {
-          const owned = profile.titles.includes(id);
-          const worn = profile.title === id;
+          const top = !!profile.position && profile.position <= LEADERBOARD_TOP;
+          const owned = id === "leaderboard" ? top : profile.titles.includes(id);
+          const badge = id === "leaderboard" ? `top:${top ? profile.position : 1}` : id;
+          const worn = shownTitle(profile.title, profile.position) === badge;
           const progress = progressFor(id, profile);
           return (
             <li key={id} className={`flex items-center gap-3 rounded-2xl p-3 ${owned ? "bg-panel" : "bg-panel/50"}`}>
               <div className="min-w-0 flex-1">
                 <div className={owned ? "" : "opacity-40 grayscale"}>
-                  <TitleBadge id={id} />
+                  <TitleBadge id={badge} />
                 </div>
                 <p className="mt-1.5 text-sm text-ink/60">
                   {TITLES[id].how}
@@ -67,7 +70,8 @@ function Achievements({ profile, onChanged }: { profile: Profile; onChanged: () 
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => void wear(worn ? null : id)}
+                  // The leaderboard title is the default for top players, so it can't be taken off.
+                  onClick={() => void wear(worn ? (id === "leaderboard" ? "leaderboard" : null) : id)}
                   className={`press shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold ${worn ? "bg-ink text-paper" : "bg-paper ring-1 ring-ink/15"}`}
                 >
                   {worn ? "Wearing" : "Wear"}
