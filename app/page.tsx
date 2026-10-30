@@ -24,6 +24,9 @@ type Screen =
   /** Reopening the room of a match that was running before the page reloaded. */
   | { kind: "resuming"; error: string | null };
 
+/** Where a guest was heading when they were asked to sign in first. */
+type Gated = "search" | "lobby";
+
 const NAME_KEY = "kartuduel:name";
 const TUTORIAL_KEY = "kartuduel:tutorial-done";
 
@@ -51,6 +54,7 @@ export default function Home() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [linkCode, setLinkCode] = useState<string | undefined>();
   const [skinsOpen, setSkinsOpen] = useState(false);
+  const [pending, setPending] = useState<Gated | null>(null);
   const account = useAccount();
 
   /** Continue the match that was running before the page reloaded. */
@@ -92,7 +96,7 @@ export default function Home() {
       window.history.replaceState(null, "", window.location.pathname);
       clearMatch();
       setLinkCode(normalizeCode(room));
-      setScreen({ kind: "lobby" });
+      setPending("lobby");
       return;
     }
     const match = loadMatch();
@@ -120,6 +124,21 @@ export default function Home() {
   // Your skin's voice is the default for every sound you make.
   useEffect(() => setSoundSkin(mySkin), [mySkin]);
   const search = () => setScreen({ kind: "search", id: Date.now() });
+
+  // Playing other people needs an account; once signed in, carry on to where they were going.
+  const needsAccount = account.available && !account.userId;
+  useEffect(() => {
+    if (!pending || !account.ready) return;
+    if (needsAccount) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the sign-in sheet for the gated action
+      setAccountOpen(true);
+      return;
+    }
+    setPending(null);
+    setAccountOpen(false);
+    if (pending === "search") search();
+    else setScreen({ kind: "lobby" });
+  }, [pending, account.ready, needsAccount]);
 
   const exit = () => {
     clearMatch();
@@ -222,8 +241,9 @@ export default function Home() {
         profile={account.profile}
         accountsAvailable={account.available}
         newPlayer={newPlayer}
-        onMatchmaking={search}
-        onOnline={() => setScreen({ kind: "lobby" })}
+        needsAccount={needsAccount}
+        onMatchmaking={() => setPending("search")}
+        onOnline={() => setPending("lobby")}
         onBot={() => setScreen({ kind: "bot", id: Date.now(), opponent: { kind: "training" } })}
         onSkins={() => setSkinsOpen(true)}
         onTutorial={() => setTutorial(true)}
@@ -244,7 +264,25 @@ export default function Home() {
           }}
         />
       )}
-      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} profile={account.profile} onChanged={account.refresh} />
+      <AccountSheet
+        open={accountOpen}
+        onClose={() => {
+          setAccountOpen(false);
+          setPending(null);
+          setLinkCode(undefined);
+        }}
+        profile={account.profile}
+        onChanged={account.refresh}
+        // Keep the pending action: it continues once the new session arrives.
+        onSignedIn={() => setAccountOpen(false)}
+        reason={
+          pending === "search"
+            ? "Masuk dulu buat cari lawan. Menang dapet bintang dan poin."
+            : pending === "lobby"
+              ? "Masuk dulu buat main sama teman."
+              : undefined
+        }
+      />
       <SkinShop
         open={skinsOpen}
         onClose={() => setSkinsOpen(false)}

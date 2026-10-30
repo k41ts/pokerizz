@@ -19,6 +19,8 @@ interface Props {
   profile: Profile | null;
   accountsAvailable: boolean;
   newPlayer: boolean;
+  /** Ranked and friend matches are for signed-in players. */
+  needsAccount: boolean;
   onMatchmaking: () => void;
   onOnline: () => void;
   onBot: () => void;
@@ -132,6 +134,7 @@ export default function Menu({
   profile,
   accountsAvailable,
   newPlayer,
+  needsAccount,
   onMatchmaking,
   onOnline,
   onBot,
@@ -172,8 +175,8 @@ export default function Menu({
             {newPlayer && (
               <BigAction title="Tutorial" hint="Belajar main dalam 1 menit" tone="red" badge="Baru pertama main? Mulai di sini" onClick={onTutorial} />
             )}
-            <BigAction title="Cari lawan" hint="Ranked, langsung dipasangin lawan" tone={newPlayer ? "dark" : "red"} onClick={onMatchmaking} />
-            <BigAction title="Main sama teman" hint="Bikin room, kirim link ke teman" tone="light" onClick={onOnline} />
+            <BigAction title="Cari lawan" hint={needsAccount ? "Ranked, perlu akun" : "Ranked, langsung dipasangin lawan"} tone={newPlayer ? "dark" : "red"} onClick={onMatchmaking} />
+            <BigAction title="Main sama teman" hint={needsAccount ? "Bikin room bareng teman, perlu akun" : "Bikin room, kirim link ke teman"} tone="light" onClick={onOnline} />
             <BigAction title="Latihan" hint="Lawan bot santai, tanpa timer" tone="light" onClick={onBot} />
             {!newPlayer && <BigAction title="Tutorial" hint="Ulang cara main" tone="light" onClick={onTutorial} />}
           </div>

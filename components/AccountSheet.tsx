@@ -11,6 +11,10 @@ interface Props {
   onClose: () => void;
   profile: Profile | null;
   onChanged: () => void;
+  /** Why the sheet opened, when a guest tried something that needs an account. */
+  reason?: string;
+  /** Called instead of onClose after a successful sign-in or sign-up. */
+  onSignedIn?: () => void;
 }
 
 export function RankBadge({ stars, className = "" }: { stars: number; className?: string }) {
@@ -65,7 +69,7 @@ function ProfileView({ profile, onSignOut }: { profile: Profile; onSignOut: () =
   );
 }
 
-export default function AccountSheet({ open, onClose, profile, onChanged }: Props) {
+export default function AccountSheet({ open, onClose, profile, onChanged, reason, onSignedIn }: Props) {
   const [mode, setMode] = useState<"signin" | "signup">("signup");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -81,7 +85,7 @@ export default function AccountSheet({ open, onClose, profile, onChanged }: Prop
       play("connect");
       setPassword("");
       onChanged();
-      onClose();
+      (onSignedIn ?? onClose)();
     } catch (err) {
       setError(err instanceof AccountError ? err.message : "Ada yang salah. Coba lagi.");
     } finally {
@@ -107,6 +111,7 @@ export default function AccountSheet({ open, onClose, profile, onChanged }: Prop
             void submit();
           }}
         >
+          {reason && <p className="rounded-2xl bg-ink px-4 py-3 text-base text-paper">{reason}</p>}
           <div className="grid grid-cols-2 gap-1 rounded-full bg-panel p-1" role="tablist">
             {(["signup", "signin"] as const).map((m) => (
               <button

@@ -29,7 +29,7 @@ Tiap ronde ada waktu 20 detik; kalau habis, kartu yang dipilih otomatis dimainin
 
 ## Akun, rank, dan skin
 
-Akun pakai Supabase Auth (username + password).
+Akun pakai Supabase Auth (username + password). Cari lawan dan Main sama teman butuh login; Latihan dan Tutorial bisa tanpa akun.
 
 - Menang lawan pemain yang login: +1 bintang, +30 poin. Kalah: +10 poin. Dicatat lewat `report_loss` dari device yang kalah, maksimal 10 kemenangan per pasangan per hari.
 - Menang lawan bot di Cari lawan: +1 bintang, +30 poin. Kalah: −1 bintang (minimal 0), +10 poin. Match harus didaftarin dulu (`start_bot_match`), minimal 20 detik, sekali lapor, maksimal 100 per hari. Hasilnya dikirim dari device pemain, jadi ini cuma memperlambat kecurangan, bukan mencegah.
