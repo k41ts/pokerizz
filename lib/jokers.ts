@@ -15,7 +15,6 @@ export type JokerId =
 export interface JokerDef {
   id: JokerId;
   name: string;
-  icon: string;
   description: string;
   /** Flat points added to the hand value. */
   bonus?: (hand: HandType, cards: Card[]) => number;
@@ -38,65 +37,56 @@ const STRONG_HANDS: HandType[] = [
 export const JOKERS: Record<JokerId, JokerDef> = {
   pasangan_setia: {
     id: "pasangan_setia",
-    name: "Pasangan Setia",
-    icon: "💞",
-    description: "+15 kalau main Pair atau Two Pair",
+    name: "Loyal Pair",
+    description: "+15 when you play a Pair or Two Pair",
     bonus: (hand) => (hand === "pair" || hand === "two_pair" ? 15 : 0),
   },
   pencinta_warna: {
     id: "pencinta_warna",
-    name: "Pencinta Warna",
-    icon: "🎨",
-    description: "+25 kalau main Flush",
+    name: "Color Lover",
+    description: "+25 when you play a Flush",
     bonus: (hand) => (hand === "flush" ? 25 : 0),
   },
   jalan_lurus: {
     id: "jalan_lurus",
-    name: "Jalan Lurus",
-    icon: "🛣️",
-    description: "+20 kalau main Straight",
+    name: "Straight Road",
+    description: "+20 when you play a Straight",
     bonus: (hand) => (hand === "straight" ? 20 : 0),
   },
   si_nekat: {
     id: "si_nekat",
-    name: "Si Nekat",
-    icon: "🎲",
-    description: "+20 kalau main High Card",
+    name: "Daredevil",
+    description: "+20 when you play a High Card",
     bonus: (hand) => (hand === "high_card" ? 20 : 0),
   },
   raja_hati: {
     id: "raja_hati",
-    name: "Raja Hati",
-    icon: "♥️",
-    description: "+5 per kartu ♥ yang dimainkan",
+    name: "King of Hearts",
+    description: "+5 for every ♥ card you play",
     bonus: (_hand, cards) => cards.filter((c) => c.suit === "H").length * 5,
   },
   tameng: {
     id: "tameng",
-    name: "Tameng",
-    icon: "🛡️",
-    description: "Damage yang kamu terima −10",
+    name: "Shield",
+    description: "You take 10 less damage",
     damageReduction: 10,
   },
   vampir: {
     id: "vampir",
-    name: "Vampir",
-    icon: "🧛",
-    description: "Pulih 5 HP tiap kali kamu memberi damage",
+    name: "Vampire",
+    description: "Heal 5 HP every time you deal damage",
     healOnHit: 5,
   },
   tangan_ekstra: {
     id: "tangan_ekstra",
-    name: "Tangan Ekstra",
-    icon: "✋",
-    description: "+1 discard tiap ronde",
+    name: "Extra Hand",
+    description: "+1 discard every round",
     extraDiscards: 1,
   },
   pengganda: {
     id: "pengganda",
-    name: "Pengganda",
-    icon: "✖️",
-    description: "Skor ×1.5 kalau main Three of a Kind atau lebih tinggi",
+    name: "Multiplier",
+    description: "Score ×1.5 on Three of a Kind or better",
     multiplier: (hand) => (STRONG_HANDS.includes(hand) ? 1.5 : 1),
   },
 };

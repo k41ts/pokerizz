@@ -48,7 +48,7 @@ function save(key: string, value: string) {
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>({ kind: "menu" });
-  const [name, setName] = useState("Pemain");
+  const [name, setName] = useState("Player");
   const [newPlayer, setNewPlayer] = useState(false);
   const [tutorial, setTutorial] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -88,6 +88,7 @@ export default function Home() {
               names: saved.names,
               userIds: saved.userIds,
               skins: saved.skins,
+              titles: saved.titles ?? [null, null],
               resume: { state: saved.state, matchId: saved.matchId },
             }),
           )
@@ -133,8 +134,9 @@ export default function Home() {
     setTutorial(false);
   }
 
-  const displayName = account.profile?.username ?? (name.trim() || "Pemain");
+  const displayName = account.profile?.username ?? (name.trim() || "Player");
   const mySkin = account.profile?.skin ?? "classic";
+  const myTitle = account.profile?.title ?? null;
   // Your skin's voice is the default for every sound you make.
   useEffect(() => setSoundSkin(mySkin), [mySkin]);
   const search = () => setScreen({ kind: "search", id: Date.now() });
@@ -172,6 +174,7 @@ export default function Home() {
         name={displayName}
         userId={account.userId}
         skin={mySkin}
+        title={myTitle}
         initialCode={linkCode}
         onBack={() => {
           setLinkCode(undefined);
@@ -187,7 +190,7 @@ export default function Home() {
     content = (
       <Matchmaking
         key={screen.id}
-        me={{ name: displayName, userId: account.userId, stars: account.profile?.stars ?? 0, skin: mySkin }}
+        me={{ name: displayName, userId: account.userId, stars: account.profile?.stars ?? 0, skin: mySkin, title: myTitle }}
         onCancel={() => setScreen({ kind: "menu" })}
         onFound={(match) =>
           setScreen(
@@ -208,6 +211,7 @@ export default function Home() {
         key={screen.id}
         name={displayName}
         skin={mySkin}
+        title={myTitle}
         opponent={screen.opponent}
         onExit={exit}
         onSearchAgain={search}
@@ -224,6 +228,7 @@ export default function Home() {
           names={screen.names}
           userIds={screen.userIds}
           skins={screen.skins}
+          titles={screen.titles}
           onExit={exit}
           onRanked={account.refresh}
           resume={screen.resume}
@@ -236,15 +241,15 @@ export default function Home() {
       <main className="grid min-h-dvh place-items-center p-6 text-center">
         {screen.error ? (
           <div className="flex max-w-sm flex-col items-center gap-4">
-            <p className="font-display text-xl">Pertandingan ga bisa dilanjutin</p>
+            <p className="font-display text-xl">This match can’t be continued</p>
             <p className="text-base text-ink/70">{screen.error}</p>
-            <PrimaryButton onClick={() => setScreen({ kind: "menu" })}>Ke menu</PrimaryButton>
+            <PrimaryButton onClick={() => setScreen({ kind: "menu" })}>Main menu</PrimaryButton>
           </div>
         ) : (
           <div className="flex max-w-sm flex-col items-center gap-5">
             <p className="flex items-center gap-2 text-base text-ink/70">
-              <span className="animate-pulse-dot size-2 rounded-full bg-signal" /> Nyambung lagi ke pertandinganmu…
-              {!!screen.seconds && <span className="tabular-nums">{screen.seconds} dtk</span>}
+              <span className="animate-pulse-dot size-2 rounded-full bg-signal" /> Reconnecting to your match…
+              {!!screen.seconds && <span className="tabular-nums">{screen.seconds}s</span>}
             </p>
             <button
               type="button"
@@ -255,7 +260,7 @@ export default function Home() {
               }}
               className="press rounded-full bg-paper px-5 py-2.5 text-base font-semibold ring-1 ring-ink/15"
             >
-              Batal, ke menu
+              Cancel, back to menu
             </button>
           </div>
         )}
@@ -305,9 +310,9 @@ export default function Home() {
         onSignedIn={() => setAccountOpen(false)}
         reason={
           pending === "search"
-            ? "Masuk dulu buat cari lawan. Menang dapet bintang dan poin."
+            ? "Sign in to find a match. Wins earn stars and points."
             : pending === "lobby"
-              ? "Masuk dulu buat main sama teman."
+              ? "Sign in to play a friend."
               : undefined
         }
       />

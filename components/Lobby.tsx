@@ -17,13 +17,14 @@ interface Props {
   name: string;
   userId: string | null;
   skin: string;
+  title: string | null;
   /** Room code from a shared link; joins right away. */
   initialCode?: string;
   onConnected: (c: Connected) => void;
   onBack: () => void;
 }
 
-export default function Lobby({ name, userId, skin, initialCode, onConnected, onBack }: Props) {
+export default function Lobby({ name, userId, skin, title, initialCode, onConnected, onBack }: Props) {
   const [step, setStep] = useState<Step>(initialCode ? { kind: "joining", busy: false, seconds: 0 } : { kind: "choose" });
   const [code, setCode] = useState(initialCode ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export default function Lobby({ name, userId, skin, initialCode, onConnected, on
       });
       play("connect");
       done.current = true;
-      onConnected(hostConnected(roomCode, link, { name, userId, skin }, hello));
+      onConnected(hostConnected(roomCode, link, { name, userId, skin, title }, hello));
     } catch (err) {
       setError(describeError(err));
       setStep({ kind: "choose" });
@@ -60,7 +61,7 @@ export default function Lobby({ name, userId, skin, initialCode, onConnected, on
   async function join(codeToJoin = code) {
     const roomCode = normalizeCode(codeToJoin);
     if (roomCode.length !== 5) {
-      setError("Kode room isinya 5 huruf/angka.");
+      setError("A room code is 5 letters or numbers.");
       return;
     }
     setError(null);
@@ -68,7 +69,7 @@ export default function Lobby({ name, userId, skin, initialCode, onConnected, on
     try {
       const link = await joinRoom(roomCode, (seconds) => setStep({ kind: "joining", busy: true, seconds }));
       linkRef.current = link;
-      send(link, { t: "hello", name, userId, skin });
+      send(link, { t: "hello", name, userId, skin, title });
       done.current = true;
       onConnected({ role: "guest", code: roomCode, link });
     } catch (err) {
@@ -99,7 +100,7 @@ export default function Lobby({ name, userId, skin, initialCode, onConnected, on
   /** Native share sheet on phones (WhatsApp etc.), copying the link elsewhere. */
   async function share(roomCode: string) {
     const url = `${window.location.origin}/?room=${roomCode}`;
-    const text = `Main Kartu Duel bareng aku! Kode room: ${roomCode}`;
+    const text = `Play Kartu Duel with me! Room code: ${roomCode}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: "Kartu Duel", text, url });
@@ -115,11 +116,11 @@ ${url}`);
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col justify-center gap-4 p-4">
       <button type="button" onClick={onBack} className="self-start text-sm text-steel hover:text-ink">
-        ← Kembali
+        ← Back
       </button>
-      <h1 className="font-display text-2xl leading-tight sm:text-4xl">Main online sama teman</h1>
+      <h1 className="font-display text-2xl leading-tight sm:text-4xl">Play online with a friend</h1>
       <p className="max-w-lg text-base text-ink/70">
-        Satu orang bikin room dan kasih kodenya. Yang lain masukin kode itu di HP atau laptopnya sendiri. Kalian main barengan, kartu masing-masing ga kelihatan di layar lawan.
+        One of you opens a room and shares the code. The other enters it on their own phone or laptop. You play at the same time, and neither of you can see the other’s cards.
       </p>
 
       {step.kind === "choose" && (
@@ -132,9 +133,9 @@ ${url}`);
             }}
             className="press group relative flex min-h-44 flex-col justify-between rounded-[28px] bg-ink p-6 text-left text-paper"
           >
-            <span className="font-display text-lg">Bikin room</span>
-            <span className="text-sm text-paper/60">Kamu dapet kode buat dikirim ke teman.</span>
-            <span className="absolute top-5 right-5 grid size-10 place-items-center rounded-full bg-signal transition-transform duration-200 ease-[var(--ease-out)] [@media(hover:hover)]:group-hover:rotate-45">
+            <span className="font-display text-lg">Open a room</span>
+            <span className="text-sm text-paper/60">You get a code to send to your friend.</span>
+            <span className="absolute top-5 right-5 grid size-10 place-items-center rounded-full bg-signal text-snow transition-transform duration-200 ease-[var(--ease-out)] [@media(hover:hover)]:group-hover:rotate-45">
               <ArrowIcon className="size-5" />
             </span>
           </button>
@@ -146,8 +147,8 @@ ${url}`);
             }}
             className="press group relative flex min-h-44 flex-col justify-between rounded-[28px] bg-paper p-6 text-left"
           >
-            <span className="font-display text-lg">Gabung room</span>
-            <span className="text-sm text-ink/60">Masukin kode dari temanmu.</span>
+            <span className="font-display text-lg">Join a room</span>
+            <span className="text-sm text-ink/60">Enter the code your friend sent.</span>
             <span className="absolute top-5 right-5 grid size-10 place-items-center rounded-full bg-ink text-paper transition-transform duration-200 ease-[var(--ease-out)] [@media(hover:hover)]:group-hover:rotate-45">
               <ArrowIcon className="size-5" />
             </span>
@@ -162,7 +163,7 @@ ${url}`);
           transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
           className="rounded-[28px] bg-paper p-6"
         >
-          <p className="text-sm text-steel">Kode room</p>
+          <p className="text-sm text-steel">Room code</p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <span className="font-display text-5xl tracking-[0.2em] sm:text-6xl" aria-live="polite">
               {step.ready ? step.code : "·····"}
@@ -171,16 +172,16 @@ ${url}`);
           {step.ready && (
             <div className="mt-4 flex flex-wrap gap-2">
               <PrimaryButton tone="red" onClick={() => void share(step.code)} className="text-base">
-                Bagikan link
+                Share link
               </PrimaryButton>
               <SecondaryButton onClick={() => void copy(step.code)} className="text-base">
-                {copied ? "Tersalin" : "Salin kode"}
+                {copied ? "Copied" : "Copy code"}
               </SecondaryButton>
             </div>
           )}
           <p className="mt-4 flex items-center gap-2 text-base text-ink/70">
             <span className="animate-pulse-dot size-2 shrink-0 rounded-full bg-signal" />
-            {step.ready ? "Nunggu temanmu gabung. Abis kirim link, balik lagi ke layar ini ya." : "Lagi bikin room…"}
+            {step.ready ? "Waiting for your friend to join. After sending the link, come back to this screen." : "Opening a room…"}
           </p>
         </motion.section>
       )}
@@ -197,7 +198,7 @@ ${url}`);
           }}
         >
           <label htmlFor="room-code" className="text-sm text-steel">
-            Kode room dari temanmu
+            Room code from your friend
           </label>
           <input
             id="room-code"
@@ -212,12 +213,12 @@ ${url}`);
             className="w-full rounded-2xl bg-panel px-5 py-4 font-display text-3xl tracking-[0.2em] outline-none placeholder:text-ink/20 focus-visible:ring-2 focus-visible:ring-signal"
           />
           <PrimaryButton tone="red" disabled={step.busy || code.length !== 5} onClick={() => void join()} className="self-start text-base">
-            {step.busy ? "Nyari room…" : "Gabung"}
+            {step.busy ? "Looking for the room…" : "Join"}
           </PrimaryButton>
           {step.busy && step.seconds >= 3 && (
             <p className="flex items-center gap-2 text-base text-ink/70">
               <span className="animate-pulse-dot size-2 shrink-0 rounded-full bg-signal" />
-              Host belum jawab ({step.seconds} detik). Minta dia buka layar room di HP-nya.
+              The host hasn’t answered yet ({step.seconds}s). Ask them to open the room screen.
             </p>
           )}
         </motion.form>

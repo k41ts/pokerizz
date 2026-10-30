@@ -1,6 +1,7 @@
 import { createDeck, createRng, shuffle, type Card, type Rng } from "./cards";
 import type { HandType } from "./hands";
 import { JOKER_IDS, sumJokers, type JokerId } from "./jokers";
+import { EFFECT_IDS, type EffectId } from "./effects";
 import { MAX_HP, resolveRound, scorePlay, type PlayScore, type RoundOutcome } from "./scoring";
 
 export type PlayerIndex = 0 | 1;
@@ -45,6 +46,10 @@ export interface GameState {
   seed: number;
   players: [PlayerState, PlayerState];
   phase: Phase;
+  /** This match's effect, for both players; missing in games saved before effects existed. */
+  effect?: EffectId;
+  /** Who dealt damage in each round so far (null when nobody did). */
+  log?: (PlayerIndex | null)[];
 }
 
 export type GameAction =
@@ -111,11 +116,12 @@ function rollOffers(owned: JokerId[], rng: Rng): JokerId[] {
   ).slice(0, JOKER_OFFERS);
 }
 
-export function createGame(mode: Mode, seed: number, names: [string, string] = ["Kamu", "Bot"]): GameState {
+export function createGame(mode: Mode, seed: number, names: [string, string] = ["You", "Bot"]): GameState {
   const rng = createRng(seed);
   const p1 = newPlayer(names[0], false, rng);
   const p2 = newPlayer(names[1], mode === "bot", rng);
-  return startRound({ mode, round: 1, seed: rng.seed, players: [p1, p2], phase: { kind: "turn" } }, 1);
+  const effect = EFFECT_IDS[Math.floor(rng.next() * EFFECT_IDS.length)];
+  return startRound({ mode, round: 1, seed: rng.seed, players: [p1, p2], phase: { kind: "turn" }, effect, log: [] }, 1);
 }
 
 function pickCards(hand: Card[], ids: string[]): Card[] | null {
@@ -206,8 +212,8 @@ function reveal(state: GameState, rng: Rng): GameState {
   const [a, b] = state.players;
   const plays: [Card[], Card[]] = [a.played!, b.played!];
   const scores: [PlayScore, PlayScore] = [
-    scorePlay(plays[0], a.jokers)!,
-    scorePlay(plays[1], b.jokers)!,
+    scorePlay(plays[0], a.jokers, state.effect)!,
+    scorePlay(plays[1], b.jokers, state.effect)!,
   ];
   const outcome = resolveRound([
     { hp: a.hp, jokers: a.jokers, score: scores[0].total },
@@ -226,10 +232,12 @@ function reveal(state: GameState, rng: Rng): GameState {
     ),
   ) as [PlayerState, PlayerState];
 
+  const hitter = outcome.winner !== null && outcome.damage[outcome.winner === 0 ? 1 : 0] > 0 ? outcome.winner : null;
   return {
     ...state,
     seed: rng.seed,
     players,
+    log: [...(state.log ?? []), hitter],
     phase: { kind: "reveal", result: { plays, scores, outcome }, ready: [false, false] },
   };
 }

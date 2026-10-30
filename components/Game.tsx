@@ -3,16 +3,18 @@
 import { LayoutGroup } from "motion/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
+import { matchCallout } from "@/lib/callouts";
 import { JOKER_EVERY, type GameState, type PlayerIndex } from "@/lib/game";
 import type { JokerId } from "@/lib/jokers";
 import { SkinContext, skinById } from "@/lib/skins";
 import Arena from "./Arena";
+import EffectStrip from "./EffectStrip";
 import GameOver from "./GameOver";
 import HandTray from "./HandTray";
 import JokerPicker from "./JokerPicker";
 import PlayerPanel, { type Impact } from "./PlayerPanel";
 import { PlayBurst } from "./SkinFx";
-import { Logo, Pill, SoundToggle } from "./ui";
+import { Logo, Pill, SoundToggle, ThemeToggle } from "./ui";
 
 /** An action as the local player sends it; the controller adds who sent it. */
 export type LocalAction =
@@ -43,6 +45,8 @@ interface Props {
   skins?: [string, string];
   /** Turn timer; none in training. */
   turnSeconds?: number;
+  /** Achievement title each player shows, by player index. */
+  titles?: [string | null, string | null];
 }
 
 /** A black strip sweeps across when a new round starts. */
@@ -70,7 +74,7 @@ function RoundBanner({ round }: { round: number }) {
             transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
           >
             <span className="h-1 w-10 bg-signal" />
-            <span className="font-display text-3xl sm:text-5xl">Ronde {round}</span>
+            <span className="font-display text-3xl sm:text-5xl">Round {round}</span>
             <span className="h-1 w-10 bg-signal" />
           </motion.div>
         </motion.div>
@@ -79,17 +83,29 @@ function RoundBanner({ round }: { round: number }) {
   );
 }
 
+/** Legendary / Epic comeback text for the end screen, told from this player's side. */
+function endCallout(view: GameState, me: PlayerIndex): { kind: "legendary" | "comeback"; detail: string } | null {
+  if (view.phase.kind !== "gameOver") return null;
+  const c = matchCallout(view.log, view.phase.winner);
+  if (!c) return null;
+  const mine = c.winner === me;
+  const name = view.players[c.winner].name;
+  if (c.kind === "legendary") return { kind: c.kind, detail: mine ? "You won without taking a single hit" : `${name} won without taking a single hit` };
+  return { kind: c.kind, detail: mine ? "You came back from their hit streak" : `${name} came back from your hit streak` };
+}
+
 export default function Game({
   view,
   me,
   act,
   onRestart,
   onExit,
-  restartLabel = "Main lagi",
+  restartLabel = "Play again",
   banner,
   rankNote,
   skins = ["classic", "classic"],
   turnSeconds,
+  titles = [null, null],
 }: Props) {
   const them: PlayerIndex = me === 0 ? 1 : 0;
   const mySkin = skinById(skins[me]);
@@ -115,7 +131,7 @@ export default function Game({
 
   const roundsToJoker = JOKER_EVERY - ((round - 1) % JOKER_EVERY);
   const status = (i: PlayerIndex) =>
-    phase.kind === "turn" ? (players[i].played ? "Kartu terkunci" : `Sisa buang ${players[i].discardsLeft}x ronde ini`) : undefined;
+    phase.kind === "turn" ? (players[i].played ? "Cards locked in" : `${players[i].discardsLeft} discard${players[i].discardsLeft === 1 ? "" : "s"} left this round`) : undefined;
 
   return (
     <LayoutGroup>
@@ -123,15 +139,16 @@ export default function Game({
         <header className="flex items-center justify-between gap-1.5 rounded-full bg-panel p-1.5 sm:gap-2 sm:pr-2">
           <Logo />
           <div className="flex items-center gap-1.5">
-            <Pill tone="light">Ronde {round}</Pill>
+            <Pill tone="light">Round {round}</Pill>
             <span className="hidden sm:inline">
-              <Pill tone="ghost">{roundsToJoker === 1 ? "Joker setelah ronde ini" : `Joker ${roundsToJoker} ronde lagi`}</Pill>
+              <Pill tone="ghost">{roundsToJoker === 1 ? "Joker after this round" : `Joker in ${roundsToJoker} rounds`}</Pill>
             </span>
           </div>
           <div className="flex items-center gap-1.5">
+            <ThemeToggle />
             <SoundToggle />
             <button type="button" onClick={onExit} className="press rounded-full bg-ink px-3 py-2 text-sm font-semibold text-paper sm:px-4">
-              Keluar
+              Leave
             </button>
           </div>
         </header>
@@ -143,13 +160,16 @@ export default function Game({
         <div className="grid grid-cols-1 gap-2 sm:gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
           <div className="flex flex-col gap-3 max-lg:contents lg:justify-between">
             <div className="max-lg:order-1">
-              <PlayerPanel player={players[them]} hp={hpOf(them)} isYou={false} status={status(them)} impact={impactOf(them)} />
+              <PlayerPanel player={players[them]} hp={hpOf(them)} isYou={false} status={status(them)} impact={impactOf(them)} title={titles[them]} />
             </div>
             <div className="max-lg:order-3">
-              <PlayerPanel player={players[me]} hp={hpOf(me)} isYou status={status(me)} impact={impactOf(me)} />
+              <PlayerPanel player={players[me]} hp={hpOf(me)} isYou status={status(me)} impact={impactOf(me)} title={titles[me]} />
             </div>
           </div>
           <div className="flex flex-col gap-3 max-lg:contents lg:min-h-0">
+            <div className="max-lg:order-2">
+              <EffectStrip effect={view.effect} fresh={round === 1 && phase.kind === "turn"} />
+            </div>
             <div className="max-lg:order-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
               {phase.kind === "jokerPick" ? (
                 <JokerPicker
@@ -194,6 +214,7 @@ export default function Game({
             restartLabel={restartLabel}
             rankNote={rankNote ?? null}
             playedCards={phase.result.plays[phase.winner ?? me]}
+            callout={endCallout(view, me)}
           />
           </SkinContext.Provider>
         )}

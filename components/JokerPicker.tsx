@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { JOKER_SLOTS, type PlayerState } from "@/lib/game";
 import { JOKERS, type JokerId } from "@/lib/jokers";
 import { play } from "@/lib/sound";
+import JokerIcon from "./JokerIcon";
 import { ArrowIcon, Pill, SecondaryButton } from "./ui";
 
 interface Props {
@@ -32,10 +33,10 @@ export default function JokerPicker({ player, offers, done, opponentDone, onPick
   if (done) {
     return (
       <section className="flex min-h-[340px] flex-col items-center justify-center gap-3 rounded-[28px] bg-ink p-6 text-center text-paper">
-        <p className="font-display text-lg">Joker dipilih</p>
+        <p className="font-display text-lg">Joker picked</p>
         <p className="flex items-center gap-2 text-sm text-paper/60">
           {!opponentDone && <span className="animate-pulse-dot size-1.5 rounded-full bg-signal" />}
-          {opponentDone ? "Lanjut ke ronde berikutnya…" : "Nunggu lawan milih Joker…"}
+          {opponentDone ? "On to the next round…" : "Waiting for your opponent to pick…"}
         </p>
       </section>
     );
@@ -45,13 +46,13 @@ export default function JokerPicker({ player, offers, done, opponentDone, onPick
     <section className="flex flex-col gap-5 rounded-[28px] bg-ink p-4 text-paper sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="font-display text-xl sm:text-2xl">Pilih satu Joker</h2>
+          <h2 className="font-display text-xl sm:text-2xl">Pick a Joker</h2>
           <p className="mt-1 text-sm text-paper/60">
-            {full ? "Slotmu penuh. Pilih Joker baru, lalu pilih yang mau diganti." : "Efeknya aktif mulai ronde depan, sampai game selesai."}
+            {full ? "Your slots are full. Pick a new Joker, then choose one to replace." : "It works from next round until the end of this game."}
           </p>
         </div>
         <Pill tone="light">
-          {player.jokers.length}/{JOKER_SLOTS} slot terisi
+          {player.jokers.length}/{JOKER_SLOTS} slots used
         </Pill>
       </div>
 
@@ -74,12 +75,12 @@ export default function JokerPicker({ player, offers, done, opponentDone, onPick
                 isChosen ? "shadow-[0_0_0_3px_var(--color-signal)]" : ""
               }`}
             >
-              <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-panel text-3xl">{j.icon}</span>
+              <JokerIcon id={id} className="size-14" />
               <span className="flex-1">
                 <span className="block font-display text-sm">{j.name}</span>
                 <span className="mt-1 block text-sm text-ink/65">{j.description}</span>
               </span>
-              <span className="absolute top-3 right-3 grid size-8 place-items-center rounded-full bg-signal text-paper transition-transform duration-200 ease-[var(--ease-out)] [@media(hover:hover)]:group-hover:rotate-45">
+              <span className="absolute top-3 right-3 grid size-8 place-items-center rounded-full bg-signal text-snow transition-transform duration-200 ease-[var(--ease-out)] [@media(hover:hover)]:group-hover:rotate-45">
                 <ArrowIcon className="size-4" />
               </span>
             </motion.button>
@@ -94,16 +95,16 @@ export default function JokerPicker({ player, offers, done, opponentDone, onPick
           transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
           className="flex flex-col items-center gap-2"
         >
-          <p className="text-sm text-paper/70">Ganti yang mana dengan {JOKERS[chosen].name}?</p>
+          <p className="text-sm text-paper/70">Replace which one with {JOKERS[chosen].name}?</p>
           <div className="flex flex-wrap justify-center gap-2">
             {player.jokers.map((id, i) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => pick(chosen, i)}
-                className="press rounded-full bg-paper/10 px-4 py-2 text-sm ring-1 ring-paper/25 hover:bg-signal"
+                className="press inline-flex items-center gap-2 rounded-full bg-paper/10 py-1.5 pr-4 pl-1.5 text-sm ring-1 ring-paper/25 hover:bg-signal hover:text-snow"
               >
-                {JOKERS[id].icon} {JOKERS[id].name}
+                <JokerIcon id={id} className="size-7" /> {JOKERS[id].name}
               </button>
             ))}
           </div>
@@ -111,7 +112,7 @@ export default function JokerPicker({ player, offers, done, opponentDone, onPick
       )}
 
       <SecondaryButton onClick={() => pick(null)} className="self-center">
-        Lewati, ga ambil Joker
+        Skip, no Joker
       </SecondaryButton>
     </section>
   );

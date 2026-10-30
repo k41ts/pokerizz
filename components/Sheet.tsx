@@ -31,7 +31,7 @@ export default function Sheet({ open, onClose, title, children }: Props) {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center sm:p-6"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -57,7 +57,7 @@ export default function Sheet({ open, onClose, title, children }: Props) {
                 type="button"
                 onClick={onClose}
                 className="press grid size-10 place-items-center rounded-full bg-panel text-lg"
-                aria-label="Tutup"
+                aria-label="Close"
               >
                 ✕
               </button>

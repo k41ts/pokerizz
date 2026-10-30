@@ -10,6 +10,7 @@ export interface Seeker {
   userId: string | null;
   stars: number;
   skin: string;
+  title: string | null;
 }
 
 export type MatchFound =
@@ -88,7 +89,7 @@ export function findMatch(me: Seeker, onSeconds: (s: number) => void, signal: Ab
     };
     signal.addEventListener("abort", () => fail(new DOMException("cancelled", "AbortError")));
 
-    const meAsSeeker = { name: me.name, userId: me.userId, skin: me.skin };
+    const meAsSeeker = { name: me.name, userId: me.userId, skin: me.skin, title: me.title };
 
     async function becomeHost(guestKey: string) {
       paired = true;

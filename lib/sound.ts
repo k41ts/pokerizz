@@ -24,7 +24,13 @@ export type Sfx =
   | "lose"
   | "click"
   | "connect"
-  | "combo";
+  | "combo"
+  /** A streak of 3+ hits broken by the other player. */
+  | "shutdown"
+  /** A match won without taking a single hit. */
+  | "legendary"
+  /** A match won after the opponent had a 3+ hit streak. */
+  | "comeback";
 
 const MUTE_KEY = "kartuduel:muted";
 
@@ -541,6 +547,33 @@ export function play(sfx: Sfx, step = 0, skin?: string) {
     case "connect":
       tone(ac, { freq: 660, type: "sine", dur: 0.12, vol: 0.15 });
       tone(ac, { freq: 990, type: "sine", dur: 0.2, vol: 0.15, start: 0.1 });
+      break;
+    case "shutdown":
+      // A machine powering down, then two heavy hits.
+      tone(ac, { freq: 900, to: 50, type: "sawtooth", dur: 0.55, vol: 0.16, low: 2400, lowTo: 300 });
+      noise(ac, { dur: 0.5, vol: 0.3, filter: "lowpass", freq: 4000, to: 150 });
+      timpani(ac, 55, 0.5, 0.7);
+      timpani(ac, 49, 0.78, 0.8);
+      strings(ac, [110, 130.81, 164.81], 0.5, 0.9, 0.06);
+      break;
+    case "legendary":
+      // Rising brass arpeggio into a bright major chord with bells and choir.
+      [261.63, 329.63, 392, 523.25].forEach((f, i) => layer(ac, { freq: f, type: "sawtooth", start: i * 0.11, dur: 0.3, vol: 0.07, low: 2600, hallSend: 0.5 }));
+      timpani(ac, 65.41, 0.44, 0.55);
+      strings(ac, [261.63, 329.63, 392, 523.25], 0.44, 1.6, 0.05);
+      choirPad(ac, [523.25, 659.25, 784], 0.44, 2, 0.04);
+      bell(ac, 1046.5, 0.5, 0.12);
+      bell(ac, 1568, 0.72, 0.08);
+      break;
+    case "comeback":
+      // Tension climbing through minor chords, then it breaks into major.
+      strings(ac, A_MIN, 0, 0.5, 0.06);
+      strings(ac, F_MAJ.map((f) => f * 1.5), 0.42, 0.5, 0.06);
+      strings(ac, E_MAJ.map((f) => f * 2), 0.84, 0.45, 0.06);
+      timpani(ac, 82.41, 0.84, 0.5);
+      timpani(ac, 110, 1.28, 0.7);
+      strings(ac, [440, 554.37, 659.25, 880], 1.28, 1.5, 0.055);
+      bell(ac, 1318.5, 1.3, 0.1);
       break;
   }
 }

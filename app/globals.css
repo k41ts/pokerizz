@@ -7,6 +7,8 @@
   --color-ink: #000000;
   --color-signal: #ff2a1f;
   --color-steel: #8b8b89;
+  /* Always white: text on red, on the skin boards and other fixed dark surfaces. */
+  --color-snow: #ffffff;
 
   --font-sans: var(--font-poppins), system-ui, sans-serif;
   --font-display: var(--font-michroma), var(--font-poppins), sans-serif;
@@ -48,6 +50,26 @@
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+/* Dark theme: surfaces go charcoal and ink goes light, so ink pills flip to light pills. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-concrete: #111113;
+    --color-panel: #1c1c1f;
+    --color-paper: #27272b;
+    --color-ink: #f1f1ee;
+    --color-steel: #8e8e93;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-concrete: #111113;
+  --color-panel: #1c1c1f;
+  --color-paper: #27272b;
+  --color-ink: #f1f1ee;
+  --color-steel: #8e8e93;
 }
 
 html {

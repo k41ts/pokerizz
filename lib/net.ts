@@ -7,9 +7,9 @@ import type { GameAction, GameState } from "./game";
 
 /** Messages between the two browsers. The host runs the game; the guest only sends actions. */
 export type NetMessage =
-  | { t: "hello"; name: string; userId: string | null; skin: string }
+  | { t: "hello"; name: string; userId: string | null; skin: string; title?: string | null }
   /** Sent by the host for every new game: who is signed in, and the id the result is recorded under. */
-  | { t: "meta"; matchId: string; userIds: [string | null, string | null]; skins: [string, string] }
+  | { t: "meta"; matchId: string; userIds: [string | null, string | null]; skins: [string, string]; titles?: [string | null, string | null] }
   | { t: "state"; state: GameState }
   | { t: "action"; action: GameAction }
   | { t: "rematch" }
@@ -55,23 +55,32 @@ export interface Link {
 
 /** A room both players are in, from the lobby or from matchmaking. */
 export type Connected =
-  | { role: "host"; code: string; link: Link; names: [string, string]; userIds: [string | null, string | null]; skins: [string, string] }
+  | {
+      role: "host";
+      code: string;
+      link: Link;
+      names: [string, string];
+      userIds: [string | null, string | null];
+      skins: [string, string];
+      titles: [string | null, string | null];
+    }
   | { role: "guest"; code: string; link: Link };
 
 /** The host side of a room once the guest has said hello. */
 export function hostConnected(
   code: string,
   link: Link,
-  me: { name: string; userId: string | null; skin: string },
+  me: { name: string; userId: string | null; skin: string; title: string | null },
   hello: Extract<NetMessage, { t: "hello" }>,
 ): Connected {
   return {
     role: "host",
     code,
     link,
-    names: [me.name, hello.name || "Teman"],
+    names: [me.name, hello.name || "Friend"],
     userIds: [me.userId, hello.userId],
     skins: [me.skin, hello.skin || "classic"],
+    titles: [me.title, hello.title ?? null],
   };
 }
 
@@ -261,8 +270,8 @@ export function send(link: Link, msg: NetMessage) {
 
 export function describeError(err: unknown): string {
   const kind = err instanceof RoomError ? err.kind : null;
-  if (kind === "not-found") return "Room ga ketemu. Cek lagi kodenya, dan minta temenmu buka layar room di HP-nya (jangan ditutup atau pindah aplikasi).";
-  if (kind === "full") return "Room itu udah ada dua pemain. Minta kode room baru.";
-  if (kind === "no-server") return "Main online belum tersedia di server ini.";
-  return "Ga bisa nyambung ke server room. Cek koneksi internet, lalu coba lagi.";
+  if (kind === "not-found") return "Room not found. Check the code, and ask your friend to keep the room screen open (not closed or in the background).";
+  if (kind === "full") return "That room already has two players. Ask for a new room code.";
+  if (kind === "no-server") return "Online play isn't available on this server.";
+  return "Couldn't reach the room server. Check your internet connection and try again.";
 }

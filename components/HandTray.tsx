@@ -126,7 +126,7 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
               </motion.span>
             ) : (
               <motion.p key="hint" className="text-sm text-ink/70 sm:text-base" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                Pilih 1–{MAX_SELECT} kartu. <span className="font-semibold text-ink">{sel.length} dipilih</span>
+                Pick 1–{MAX_SELECT} cards. <span className="font-semibold text-ink">{sel.length} selected</span>
               </motion.p>
             )}
           </AnimatePresence>
@@ -136,10 +136,10 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
             className={`flex shrink-0 items-baseline gap-1 font-display tabular-nums ${urgent ? "animate-pulse-dot text-signal" : ""}`}
             role="timer"
             aria-live="off"
-            aria-label={`${left} detik lagi`}
+            aria-label={`${left} seconds left`}
           >
             <span className="text-3xl sm:text-4xl">{left}</span>
-            <span className="text-sm">dtk</span>
+            <span className="text-sm">s</span>
           </p>
         )}
       </div>
@@ -155,13 +155,13 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
       <div className="sticky bottom-0 z-20 -mx-3 mt-3 flex items-center gap-2 rounded-b-[22px] bg-paper/95 px-3 py-3 backdrop-blur sm:static sm:mx-0 sm:mt-4 sm:justify-between sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <SecondaryButton
           onClick={() => setSortBy(sortBy === "rank" ? "suit" : "rank")}
-          aria-label={`Urutkan per ${sortBy === "rank" ? "simbol" : "angka"}`}
+          aria-label={`Sort by ${sortBy === "rank" ? "suit" : "rank"}`}
           className="shrink-0 whitespace-nowrap max-sm:px-3"
         >
           <span className="sm:hidden" aria-hidden>
             {sortBy === "rank" ? "A↓" : "♠♥"}
           </span>
-          <span className="max-sm:hidden">Urut: {sortBy === "rank" ? "Angka" : "Simbol"}</span>
+          <span className="max-sm:hidden">Sort: {sortBy === "rank" ? "Rank" : "Suit"}</span>
         </SecondaryButton>
         <div className="flex min-w-0 flex-1 gap-2 sm:flex-none">
           <SecondaryButton
@@ -173,7 +173,7 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
               setSelected([]);
             }}
           >
-            Buang ({player.discardsLeft})
+            Discard ({player.discardsLeft})
           </SecondaryButton>
           <PrimaryButton
             tone="red"
@@ -184,7 +184,7 @@ export default function HandTray({ player, onDiscard, onPlay, turnSeconds }: Pro
               onPlay(sel);
             }}
           >
-            Main
+            Play
           </PrimaryButton>
         </div>
       </div>

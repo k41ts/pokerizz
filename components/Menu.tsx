@@ -9,7 +9,9 @@ import { play } from "@/lib/sound";
 import { RankBadge } from "./AccountSheet";
 import CardArt from "./CardArt";
 import ComboGuide from "./ComboGuide";
-import { ArrowIcon, Logo, SoundToggle } from "./ui";
+import JokerIcon from "./JokerIcon";
+import { TitleBadge } from "./TitleBadge";
+import { ArrowIcon, Logo, SoundToggle, ThemeToggle } from "./ui";
 
 const FAN = [card(10, "H"), card(11, "D"), card(14, "S"), card(12, "S"), card(13, "H")];
 
@@ -68,7 +70,7 @@ function BigAction({
   badge?: string;
 }) {
   const tones = {
-    red: "bg-signal text-paper",
+    red: "bg-signal text-snow",
     dark: "bg-ink text-paper",
     light: "bg-paper text-ink ring-1 ring-ink/15",
   };
@@ -82,9 +84,9 @@ function BigAction({
       className={`press group relative flex w-full items-center justify-between gap-4 rounded-[24px] px-5 py-4 text-left sm:px-6 sm:py-5 ${tones[tone]}`}
     >
       <span>
-        {badge && <span className="mb-1 inline-block rounded-full bg-signal px-2.5 py-0.5 text-xs font-semibold text-paper">{badge}</span>}
+        {badge && <span className="mb-1 inline-block rounded-full bg-paper px-2.5 py-0.5 text-xs font-semibold text-signal">{badge}</span>}
         <span className="block font-display text-lg sm:text-xl">{title}</span>
-        <span className={`block text-sm sm:text-base ${tone === "light" ? "text-ink/60" : "text-paper/75"}`}>{hint}</span>
+        <span className={`block text-sm sm:text-base ${tone === "light" ? "text-ink/60" : tone === "red" ? "text-snow/80" : "text-paper/75"}`}>{hint}</span>
       </span>
       <span
         className={`grid size-11 shrink-0 place-items-center rounded-full transition-transform duration-200 ease-[var(--ease-out)] [@media(hover:hover)]:group-hover:rotate-45 ${
@@ -105,11 +107,11 @@ function Leaderboard({ me }: { me: Profile | null }) {
 
   return (
     <section className="rounded-[28px] bg-paper p-5 sm:p-6">
-      <h2 className="font-display text-lg">Papan peringkat</h2>
+      <h2 className="font-display text-lg">Leaderboard</h2>
       {rows === null ? (
-        <p className="mt-4 text-base text-ink/60">Memuat…</p>
+        <p className="mt-4 text-base text-ink/60">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="mt-4 text-base text-ink/60">Belum ada yang punya bintang. Jadilah yang pertama.</p>
+        <p className="mt-4 text-base text-ink/60">Nobody has a star yet. Be the first.</p>
       ) : (
         <ol className="mt-4 flex flex-col gap-1.5">
           {rows.map((p, i) => (
@@ -118,7 +120,10 @@ function Leaderboard({ me }: { me: Profile | null }) {
               className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-base ${p.id === me?.id ? "bg-ink text-paper" : "bg-panel"}`}
             >
               <span className="w-6 text-center font-display text-sm">{i + 1}</span>
-              <span className="min-w-0 flex-1 truncate font-medium">{p.username}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{p.username}</span>
+                {p.title && <TitleBadge id={p.title} className="mt-0.5" />}
+              </span>
               <RankBadge stars={p.stars} className="text-sm" />
             </li>
           ))}
@@ -147,6 +152,7 @@ export default function Menu({
       <header className="flex items-center justify-between gap-2 rounded-full bg-panel p-1.5">
         <Logo />
         <div className="flex items-center gap-1.5">
+          <ThemeToggle />
           <SoundToggle />
           {accountsAvailable && (
             <button
@@ -157,7 +163,7 @@ export default function Menu({
               }}
               className="press rounded-full bg-ink px-4 py-2 text-sm font-semibold text-paper"
             >
-              {profile ? <RankBadge stars={profile.stars} /> : "Masuk / Daftar"}
+              {profile ? <RankBadge stars={profile.stars} /> : "Sign in"}
             </button>
           )}
         </div>
@@ -166,23 +172,23 @@ export default function Menu({
       <section className="grid grid-cols-1 items-center gap-6 rounded-[32px] bg-paper p-5 sm:p-8 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-5">
           <div>
-            <h1 className="font-display text-[clamp(1.7rem,5vw,2.8rem)] leading-[1.1]">Adu kartu poker, habisi HP lawan.</h1>
+            <h1 className="font-display text-[clamp(1.7rem,5vw,2.8rem)] leading-[1.1]">Play poker combos. Drain their HP.</h1>
             <p className="mt-3 text-base text-ink/70 sm:text-lg">
-              Pilih kartu, bikin kombinasi, skor tertinggi nyerang. Satu game sekitar 5 menit.
+              Pick cards, build a combo, and the higher score attacks. A match takes about 5 minutes.
             </p>
           </div>
           <div className="flex flex-col gap-2.5">
             {newPlayer && (
-              <BigAction title="Tutorial" hint="Belajar main dalam 1 menit" tone="red" badge="Baru pertama main? Mulai di sini" onClick={onTutorial} />
+              <BigAction title="Tutorial" hint="Learn to play in a minute" tone="red" badge="New here? Start with this" onClick={onTutorial} />
             )}
-            <BigAction title="Cari lawan" hint={needsAccount ? "Ranked, perlu akun" : "Ranked, langsung dipasangin lawan"} tone={newPlayer ? "dark" : "red"} onClick={onMatchmaking} />
-            <BigAction title="Main sama teman" hint={needsAccount ? "Bikin room bareng teman, perlu akun" : "Bikin room, kirim link ke teman"} tone="light" onClick={onOnline} />
-            <BigAction title="Latihan" hint="Lawan bot santai, tanpa timer" tone="light" onClick={onBot} />
-            {!newPlayer && <BigAction title="Tutorial" hint="Ulang cara main" tone="light" onClick={onTutorial} />}
+            <BigAction title="Find a match" hint={needsAccount ? "Ranked, needs an account" : "Ranked, paired with an opponent right away"} tone={newPlayer ? "dark" : "red"} onClick={onMatchmaking} />
+            <BigAction title="Play a friend" hint={needsAccount ? "Private room, needs an account" : "Open a room, send your friend the link"} tone="light" onClick={onOnline} />
+            <BigAction title="Practice" hint="Relaxed match against a bot, no timer" tone="light" onClick={onBot} />
+            {!newPlayer && <BigAction title="Tutorial" hint="Go over the rules again" tone="light" onClick={onTutorial} />}
           </div>
           {!profile && (
             <label className="flex items-center gap-3 text-base">
-              <span className="text-ink/60">Nama tamu</span>
+              <span className="text-ink/60">Practice name</span>
               <input
                 value={name}
                 maxLength={14}
@@ -204,14 +210,14 @@ export default function Menu({
             {profile ? (
               <>
                 <div>
-                  <p className="text-base text-paper/60">Rank kamu</p>
+                  <p className="text-base text-paper/60">Your rank</p>
                   <p className="font-display text-3xl">{tierFor(profile.stars).name}</p>
                 </div>
                 <p className="font-display text-5xl">
                   <span className="text-signal">★</span> {profile.stars}
                 </p>
                 <p className="text-base text-paper/70">
-                  {profile.wins} menang, {profile.losses} kalah. Di Cari lawan dan Main sama teman: menang +1 bintang, kalah −1.
+                  {profile.wins} wins, {profile.losses} losses. Ranked and friend matches: +1 star for a win, −1 for a loss.
                 </p>
                 <button
                   type="button"
@@ -219,26 +225,26 @@ export default function Menu({
                   className="press flex items-center justify-between gap-3 rounded-2xl bg-paper/10 px-4 py-3 text-left ring-1 ring-paper/20 hover:bg-paper/15"
                 >
                   <span>
-                    <span className="block font-semibold">Skin kartu</span>
-                    <span className="block text-sm text-paper/60">{profile.points} poin buat buka skin baru</span>
+                    <span className="block font-semibold">Card skins</span>
+                    <span className="block text-sm text-paper/60">{profile.points} points to spend on new skins</span>
                   </span>
-                  <span className="font-display text-sm">Buka</span>
+                  <span className="font-display text-sm">Open</span>
                 </button>
               </>
             ) : (
               <>
                 <div>
-                  <p className="font-display text-xl">Kumpulin bintang</p>
+                  <p className="font-display text-xl">Collect stars</p>
                   <p className="mt-2 text-base text-paper/70">
-                    Bikin akun, main Cari lawan, kumpulin bintang dan poin. Naik dari Pemula sampai Berlian, buka skin kartu buat dipamerin ke lawan.
+                    Create an account to find matches and play friends. Climb from Rookie to Diamond, earn titles and unlock card skins to show off.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={onAccount}
-                  className="press self-start rounded-full bg-signal px-5 py-3 text-base font-semibold text-paper"
+                  className="press self-start rounded-full bg-signal px-5 py-3 text-base font-semibold text-snow"
                 >
-                  Bikin akun gratis
+                  Create a free account
                 </button>
               </>
             )}
@@ -248,21 +254,19 @@ export default function Menu({
       )}
 
       <section id="kombinasi" className="rounded-[28px] bg-paper p-5 sm:p-8">
-        <h2 className="mb-3 font-display text-xl">Daftar kombinasi</h2>
+        <h2 className="mb-3 font-display text-xl">Combos</h2>
         <ComboGuide />
       </section>
 
       <details className="group rounded-[28px] bg-paper p-5 sm:p-8">
         <summary className="flex cursor-pointer list-none items-center justify-between font-display text-xl">
-          Daftar Joker
+          Jokers
           <span className="text-2xl transition-transform duration-200 group-open:rotate-45">+</span>
         </summary>
         <ul className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {JOKER_IDS.map((id) => (
             <li key={id} className="flex items-start gap-3 rounded-2xl bg-panel p-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-paper text-xl" aria-hidden>
-                {JOKERS[id].icon}
-              </span>
+              <JokerIcon id={id} className="size-10" />
               <span className="text-base">
                 <span className="block font-semibold">{JOKERS[id].name}</span>
                 <span className="text-ink/65">{JOKERS[id].description}</span>

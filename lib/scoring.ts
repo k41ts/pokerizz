@@ -1,4 +1,5 @@
 import type { Card } from "./cards";
+import { EFFECTS, type EffectId } from "./effects";
 import { chipValue, evaluateHand, HAND_INFO, type HandType } from "./hands";
 import { JOKERS, sumJokers, type JokerId } from "./jokers";
 
@@ -13,12 +14,14 @@ export interface PlayScore {
   /** Every played card adds its point value, including extra cards outside the combination. */
   chips: number;
   bonuses: { jokerId: JokerId; amount: number }[];
+  /** This match's effect, when it changed the score (a negative amount is a tax). */
+  effect: { id: EffectId; amount: number } | null;
   multiplier: number;
   total: number;
 }
 
-/** total = (combination value + points of every played card + joker bonuses) × joker multiplier */
-export function scorePlay(cards: Card[], jokers: JokerId[]): PlayScore | null {
+/** total = (combination value + points of every played card + joker bonuses + match effect) × joker multiplier */
+export function scorePlay(cards: Card[], jokers: JokerId[], effectId?: EffectId): PlayScore | null {
   const result = evaluateHand(cards);
   if (!result) return null;
   const { type: hand, scoring } = result;
@@ -33,15 +36,18 @@ export function scorePlay(cards: Card[], jokers: JokerId[]): PlayScore | null {
     if (amount > 0) bonuses.push({ jokerId: id, amount });
     multiplier *= def.multiplier?.(hand) ?? 1;
   }
-  const subtotal = base + chips + bonuses.reduce((s, b) => s + b.amount, 0);
+  const effectAmount = effectId ? EFFECTS[effectId].bonus(hand, cards) : 0;
+  const effect = effectId && effectAmount !== 0 ? { id: effectId, amount: effectAmount } : null;
+  const subtotal = base + chips + bonuses.reduce((s, b) => s + b.amount, 0) + effectAmount;
   return {
     hand,
     base,
     scoring,
     chips,
     bonuses,
+    effect,
     multiplier,
-    total: Math.round(subtotal * multiplier),
+    total: Math.max(0, Math.round(subtotal * multiplier)),
   };
 }
 

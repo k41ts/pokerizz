@@ -22,6 +22,7 @@ export type SavedMatch =
       names: [string, string];
       userIds: [string | null, string | null];
       skins: [string, string];
+      titles?: [string | null, string | null];
     }
   | { kind: "guest"; code: string };
 

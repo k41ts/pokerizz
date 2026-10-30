@@ -3,9 +3,12 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { card, type Card } from "@/lib/cards";
-import { JOKERS } from "@/lib/jokers";
+import { HAND_INFO, HAND_TYPES } from "@/lib/hands";
 import { play } from "@/lib/sound";
 import CardArt from "./CardArt";
+import { EXAMPLES } from "./ComboGuide";
+import JokerIcon from "./JokerIcon";
+import { JOKERS } from "@/lib/jokers";
 import { PrimaryButton, SecondaryButton } from "./ui";
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
@@ -40,8 +43,8 @@ function GoalDemo() {
   return (
     <div className="grid w-full max-w-sm grid-cols-2 gap-3">
       {[
-        ["Kamu", 100],
-        ["Lawan", hp],
+        ["You", 100],
+        ["Opponent", hp],
       ].map(([who, value]) => (
         <div key={who} className="rounded-2xl bg-paper p-4 text-left text-ink">
           <p className="text-sm text-ink/60">{who}</p>
@@ -69,7 +72,7 @@ function PickDemo() {
           <Mini key={c.id} c={c} lifted={lifted(i)} glow={lifted(i)} w="w-11 sm:w-14" />
         ))}
       </div>
-      <p className="h-8 font-display text-lg">{step === 2 ? "Pair · As" : step === 1 ? "High Card" : "Ketuk kartu…"}</p>
+      <p className="h-8 font-display text-lg">{step === 2 ? "Pair of Aces" : step === 1 ? "High Card" : "Tap cards…"}</p>
     </div>
   );
 }
@@ -119,7 +122,7 @@ function DiscardDemo() {
           ))}
         </AnimatePresence>
       </div>
-      <p className="h-8 font-display text-lg">{step === 0 ? "Kartu jelek…" : step === 1 ? "Pilih, tekan Buang" : "Dapat kartu baru!"}</p>
+      <p className="h-8 font-display text-lg">{step === 0 ? "Weak cards…" : step === 1 ? "Select them, press Discard" : "Fresh cards!"}</p>
     </div>
   );
 }
@@ -130,7 +133,7 @@ function ClashDemo() {
     <div className="flex w-full max-w-sm flex-col items-center gap-3">
       <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
         <div className="rounded-2xl bg-paper p-4 text-ink">
-          <p className="text-sm text-ink/60">Kamu</p>
+          <p className="text-sm text-ink/60">You</p>
           <p className="font-display text-3xl">70</p>
         </div>
         <span className="font-display text-paper/40">VS</span>
@@ -139,12 +142,57 @@ function ClashDemo() {
           animate={step === 2 ? { transform: ["translateX(0px)", "translateX(-8px)", "translateX(6px)", "translateX(0px)"] } : { transform: "translateX(0px)" }}
           transition={{ duration: 0.4 }}
         >
-          <p className="text-sm text-ink/60">Lawan</p>
+          <p className="text-sm text-ink/60">Opponent</p>
           <p className="font-display text-3xl">42</p>
           {step === 2 && <span className="animate-float-up absolute -top-3 right-2 font-display text-2xl text-signal">−28</span>}
         </motion.div>
       </div>
-      <p className="h-8 font-display text-lg">{step === 2 ? "70 − 42 = 28 damage" : "Buka barengan…"}</p>
+      <p className="h-8 font-display text-lg">{step === 2 ? "70 − 42 = 28 damage" : "Both reveal at once…"}</p>
+    </div>
+  );
+}
+
+/** Cycles through every combo with a real example, weakest to strongest. */
+function ComboDemo() {
+  const step = useLoop(HAND_TYPES.length, 1500);
+  const hand = HAND_TYPES[step];
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="flex h-24 items-end justify-center gap-1.5 sm:h-28">
+        <AnimatePresence mode="popLayout">
+          {EXAMPLES[hand].cards.map((c, i) => (
+            <motion.div
+              key={`${hand}-${c.id}`}
+              initial={{ opacity: 0, transform: "translateY(24px)" }}
+              animate={{ opacity: 1, transform: "translateY(0px)" }}
+              exit={{ opacity: 0, transform: "translateY(-16px)" }}
+              transition={{ duration: 0.3, ease: EASE_OUT, delay: i * 0.04 }}
+              className="w-12 rounded-[9%] shadow-md sm:w-14"
+            >
+              <CardArt card={c} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+      <p className="font-display text-lg">
+        {HAND_INFO[hand].label} <span className="text-signal">{HAND_INFO[hand].value}</span>
+      </p>
+      <div className="flex gap-1" aria-hidden>
+        {HAND_TYPES.map((h, k) => (
+          <span key={h} className={`h-1.5 w-4 rounded-full ${k <= step ? "bg-signal" : "bg-paper/20"}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EffectDemo() {
+  const step = useLoop(2, 1600);
+  return (
+    <div className="flex max-w-xs flex-col items-center gap-3 text-center">
+      <span className="rounded-full bg-signal px-3 py-1 font-display text-xs text-snow">Match effect</span>
+      <p className="font-display text-xl">{step === 0 ? "House Tax" : "Even Steven"}</p>
+      <p className="text-sm text-paper/70">{step === 0 ? "Full House scores −30 this match." : "+5 for every even card you play this match."}</p>
     </div>
   );
 }
@@ -159,7 +207,7 @@ function JokerDemo() {
         animate={{ opacity: 1, transform: "perspective(600px) rotateY(0deg)" }}
         transition={{ duration: 0.5, ease: EASE_OUT }}
       >
-        <span className="text-3xl">{j.icon}</span>
+        <JokerIcon id="pasangan_setia" className="size-11" />
         <span className="font-display text-sm">{j.name}</span>
         <span className="text-sm text-ink/65">{j.description}</span>
       </motion.div>
@@ -176,35 +224,69 @@ function JokerDemo() {
   );
 }
 
-const SLIDES = [
+const COMBO_RULE: Record<(typeof HAND_TYPES)[number], string> = {
+  high_card: "no combo, best single card",
+  pair: "2 of the same rank",
+  two_pair: "two different pairs",
+  three_kind: "3 of the same rank",
+  straight: "5 ranks in a row",
+  flush: "5 of one suit",
+  full_house: "three of a kind + a pair",
+  four_kind: "4 of the same rank",
+  straight_flush: "a straight in one suit",
+};
+
+const SLIDES: { title: string; body: React.ReactNode; Demo: () => React.ReactNode }[] = [
   {
-    title: "Habisin HP lawan",
-    body: "Kamu dan lawan mulai dengan 100 HP. Yang HP-nya habis duluan, kalah.",
+    title: "Knock their HP to zero",
+    body: "You and your opponent both start with 100 HP. Whoever runs out first loses.",
     Demo: GoalDemo,
   },
   {
-    title: "Pilih kartu",
-    body: "Tiap ronde kamu pegang 8 kartu. Ketuk 1–5 kartu buat bikin kombinasi poker. Begitu kartu yang kamu pilih bentuk kombinasi, namanya muncul. Di Cari lawan ada 20 detik tiap ronde.",
+    title: "Pick your cards",
+    body: "Each round you hold 8 cards. Tap 1–5 of them to build a poker combo. As soon as your selection forms a combo, its name appears. Ranked and friend matches give you 20 seconds a round.",
     Demo: PickDemo,
   },
   {
-    title: "Hitung skor",
-    body: "Skor = nilai kombinasi + nilai semua kartu yang kamu mainkan, termasuk kartu tambahan. Angka 2–9 sesuai angkanya, 10/J/Q/K bernilai 10, As 11.",
+    title: "The combos you can play",
+    body: (
+      <>
+        Weakest to strongest. The full list with examples is on the main menu.
+        <ul className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2 sm:text-base">
+          {HAND_TYPES.map((h) => (
+            <li key={h} className="flex justify-between gap-2 border-b border-ink/10 py-1">
+              <span className="font-semibold text-ink">{HAND_INFO[h].label}</span>
+              <span className="text-right">{COMBO_RULE[h]}</span>
+            </li>
+          ))}
+        </ul>
+      </>
+    ),
+    Demo: ComboDemo,
+  },
+  {
+    title: "Count the score",
+    body: "Score = the combo's value + the points of every card you play, extra cards included. Cards 2–9 are worth their number, 10/J/Q/K are worth 10 and an Ace is worth 11.",
     Demo: ScoreDemo,
   },
   {
-    title: "Buang kartu jelek",
-    body: "Pilih kartu yang ga kepake lalu tekan Buang. Kamu dapat kartu baru. Bisa 2 kali tiap ronde.",
+    title: "Throw away weak cards",
+    body: "Select the cards you don't need and press Discard to draw new ones. You can do this twice a round.",
     Demo: DiscardDemo,
   },
   {
-    title: "Adu dan serang",
-    body: "Kartu kalian dibuka barengan. Skor lebih tinggi menyerang, damage-nya selisih skor.",
+    title: "Clash",
+    body: "Both hands are revealed at the same time. The higher score attacks, and the damage is the difference between the scores.",
     Demo: ClashDemo,
   },
   {
-    title: "Joker dan bintang",
-    body: "Tiap 3 ronde pilih satu Joker buat bonus. Di Cari lawan dan Main sama teman, menang +1 bintang dan kalah −1. Poin dari tiap match bisa buat buka skin kartu.",
+    title: "Every match has an effect",
+    body: "Each match rolls one effect that applies to both players from the first round to the last. Some reward a combo, some tax one, so the best hand changes from match to match. You see it before round 1, and it stays on screen. Jokers are different: you pick those yourself during the match.",
+    Demo: EffectDemo,
+  },
+  {
+    title: "Jokers and stars",
+    body: "Every 3 rounds you pick a Joker, a bonus that lasts for the rest of that match. In ranked and friend matches a win gives +1 star and a loss costs one. Points from every match unlock card skins.",
     Demo: JokerDemo,
   },
 ];
@@ -240,13 +322,13 @@ export default function Tutorial({ onClose, onPlayBot }: Props) {
     <div role="dialog" aria-modal="true" aria-label="Tutorial" className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-concrete">
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 p-4 sm:p-8">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex gap-1.5" aria-label={`Langkah ${i + 1} dari ${SLIDES.length}`}>
+          <div className="flex gap-1.5" aria-label={`Step ${i + 1} of ${SLIDES.length}`}>
             {SLIDES.map((_, k) => (
               <span key={k} className={`h-2 rounded-full transition-[width,background-color] duration-300 ${k === i ? "w-8 bg-signal" : k < i ? "w-2 bg-ink" : "w-2 bg-ink/20"}`} />
             ))}
           </div>
           <button type="button" onClick={onClose} className="text-base text-ink/60 hover:text-ink">
-            Lewati
+            Skip
           </button>
         </div>
 
@@ -267,10 +349,10 @@ export default function Tutorial({ onClose, onPlayBot }: Props) {
               </div>
               <div className="bg-paper p-6 text-ink sm:p-8">
                 <p className="text-sm text-ink/50">
-                  Langkah {i + 1} dari {SLIDES.length}
+                  Step {i + 1} of {SLIDES.length}
                 </p>
                 <h2 className="mt-1 font-display text-2xl sm:text-3xl">{slide.title}</h2>
-                <p className="mt-2 text-base leading-relaxed text-ink/75 sm:text-lg">{slide.body}</p>
+                <div className="mt-2 text-base leading-relaxed text-ink/75 sm:text-lg">{slide.body}</div>
               </div>
             </motion.div>
           </AnimatePresence>
@@ -278,15 +360,15 @@ export default function Tutorial({ onClose, onPlayBot }: Props) {
 
         <div className="flex items-center justify-between gap-3">
           <SecondaryButton disabled={i === 0} onClick={() => go(i - 1)} className="text-base">
-            Kembali
+            Back
           </SecondaryButton>
           {last ? (
             <PrimaryButton tone="red" onClick={onPlayBot} className="text-base">
-              Coba lawan bot
+              Try a practice match
             </PrimaryButton>
           ) : (
             <PrimaryButton onClick={() => go(i + 1)} className="text-base">
-              Lanjut
+              Next
             </PrimaryButton>
           )}
         </div>

@@ -2,12 +2,15 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { roundCallout, type RoundCallout } from "@/lib/callouts";
 import type { Card } from "@/lib/cards";
 import type { GameState, PlayerIndex, RoundResult } from "@/lib/game";
 import { chipValue, HAND_INFO, HAND_TYPES } from "@/lib/hands";
+import { EFFECTS } from "@/lib/effects";
 import { JOKERS } from "@/lib/jokers";
 import { SkinContext, skinById } from "@/lib/skins";
 import { play, type Sfx } from "@/lib/sound";
+import Callout from "./Callout";
 import HandFx, { FX_HOLD } from "./HandFx";
 import PlayingCard from "./PlayingCard";
 import { AnimatedNumber, Pill, PrimaryButton } from "./ui";
@@ -20,10 +23,10 @@ function Slots({ text }: { text: string }) {
     <div className="flex flex-col items-center gap-2">
       <div className="flex w-full justify-center gap-2 max-sm:hidden">
         {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className={`${CARD_W} aspect-[5/7] rounded-[9%] border border-dashed border-paper/20`} />
+          <div key={i} className={`${CARD_W} aspect-[5/7] rounded-[9%] border border-dashed border-snow/20`} />
         ))}
       </div>
-      <p className="text-sm text-paper/50">{text}</p>
+      <p className="text-sm text-snow/50">{text}</p>
     </div>
   );
 }
@@ -71,7 +74,8 @@ function buildBeats(result: RoundResult, order: PlayerIndex[]): Beat[] {
     // Combination cards first, then the extra cards, which also add their points.
     const extras = result.plays[side].filter((c) => !s.scoring.some((x) => x.id === c.id));
     [...s.scoring, ...extras].forEach((card, step) => beats.push({ kind: "chip", side, card, value: chipValue(card.rank), step }));
-    for (const b of s.bonuses) beats.push({ kind: "bonus", side, text: `${JOKERS[b.jokerId].icon} ${JOKERS[b.jokerId].name}`, value: b.amount });
+    for (const b of s.bonuses) beats.push({ kind: "bonus", side, text: JOKERS[b.jokerId].name, value: b.amount });
+    if (s.effect) beats.push({ kind: "bonus", side, text: EFFECTS[s.effect.id].name, value: s.effect.amount });
     if (s.multiplier !== 1) beats.push({ kind: "mult", side, value: s.multiplier });
   }
   beats.push({ kind: "clash" }, { kind: "done" });
@@ -111,12 +115,14 @@ interface RevealProps {
   skins: [string, string];
   names: [string, string];
   instant?: boolean;
+  /** Set when this round broke a 3+ hit streak. */
+  shutdown: RoundCallout | null;
   onImpact: () => void;
   footer: (done: boolean) => React.ReactNode;
 }
 
 /** Plays the round out beat by beat: flip, count each scoring card, add jokers, then clash. */
-function RevealSequence({ result, me, skins, names, instant, onImpact, footer }: RevealProps) {
+function RevealSequence({ result, me, skins, names, instant, shutdown, onImpact, footer }: RevealProps) {
   const them: PlayerIndex = me === 0 ? 1 : 0;
   const beats = useMemo(() => buildBeats(result, [them, me]), [result, them, me]);
   const [beat, setBeat] = useState(instant ? beats.length - 1 : -1);
@@ -159,6 +165,22 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
     }
   }, [beat, clashAt, onImpact]);
 
+  // A broken streak gets its own moment right after the hit lands.
+  const [showShutdown, setShowShutdown] = useState(false);
+  const shutdownAt = beat >= clashAt && !instant && !!shutdown;
+  useEffect(() => {
+    if (!shutdownAt) return;
+    const show = setTimeout(() => {
+      setShowShutdown(true);
+      play("shutdown");
+    }, 280);
+    const hide = setTimeout(() => setShowShutdown(false), 2900);
+    return () => {
+      clearTimeout(show);
+      clearTimeout(hide);
+    };
+  }, [shutdownAt]);
+
   const passed = beats.slice(0, beat + 1);
   const flipped = beat >= 0;
   const clashed = beat >= clashAt;
@@ -186,7 +208,7 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
         ? current.kind === "chip"
           ? { key: beat, text: `+${current.value}`, cardId: current.card.id }
           : current.kind === "bonus"
-            ? { key: beat, text: `+${current.value} ${current.text}`, cardId: null }
+            ? { key: beat, text: `${current.value > 0 ? "+" : "−"}${Math.abs(current.value)} ${current.text}`, cardId: null }
             : current.kind === "mult"
               ? { key: beat, text: `×${current.value}`, cardId: null }
               : null
@@ -196,7 +218,7 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
       <SkinContext.Provider value={skinById(skins[side])}>
       <div className={`flex flex-col items-center gap-3 transition-opacity duration-300 ${lost ? "opacity-55" : ""}`}>
         <div className="flex w-full items-center justify-between gap-2">
-          <span className="text-sm text-paper/60">{side === me ? "Kamu" : names[side]}</span>
+          <span className="text-sm text-snow/60">{side === me ? "You" : names[side]}</span>
           <div className="flex items-center gap-2">
             <AnimatePresence>
               {labelShown && (
@@ -211,7 +233,7 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
                 </motion.span>
               )}
             </AnimatePresence>
-            <span className={`font-display text-2xl sm:text-3xl ${won ? "text-signal" : "text-paper"}`}>
+            <span className={`font-display text-2xl sm:text-3xl ${won ? "text-signal" : "text-snow"}`}>
               <AnimatedNumber value={score} />
             </span>
           </div>
@@ -238,7 +260,7 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
             );
           })}
           {popup && popup.cardId === null && (
-            <span key={popup.key} className="animate-float-up pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-signal px-3 py-1 text-sm font-semibold text-paper">
+            <span key={popup.key} className="animate-float-up pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-signal px-3 py-1 text-sm font-semibold text-snow">
               {popup.text}
             </span>
           )}
@@ -253,6 +275,24 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
 
   return (
     <div className="flex flex-col gap-4">
+      <AnimatePresence>
+        {showShutdown && shutdown && (
+          <motion.div
+            key="shutdown"
+            className="pointer-events-none absolute inset-x-0 top-1/2 z-20 -translate-y-1/2"
+            exit={{ opacity: 0, transition: { duration: 0.25 } }}
+          >
+            <Callout
+              kind="shutdown"
+              detail={
+                shutdown.by === me
+                  ? `You ended ${names[them]}'s ${shutdown.streak}-hit streak`
+                  : `${names[them]} ended your ${shutdown.streak}-hit streak`
+              }
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
       {fx && (
         <HandFx
           id={fx.id}
@@ -263,7 +303,7 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
       )}
       {sideView(them)}
       <div className="relative flex h-10 items-center justify-center">
-        <div className="absolute inset-x-0 top-1/2 h-px bg-paper/15" />
+        <div className="absolute inset-x-0 top-1/2 h-px bg-snow/15" />
         <AnimatePresence mode="wait">
           {clashed ? (
             <motion.p
@@ -274,15 +314,15 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
               className="relative rounded-full bg-paper px-4 py-1.5 text-center text-xs font-semibold text-ink sm:text-sm"
             >
               {winner === null
-                ? "Seri. Ga ada damage."
+                ? "Tie. No damage."
                 : damage[winner === me ? them : me] === 0
-                  ? "Menang ronde, tapi Tameng nahan semua damage."
+                  ? "Round won, but a Shield blocked all the damage."
                   : winner === me
-                    ? `Kamu menang ronde. Lawan −${damage[them]} HP`
-                    : `Lawan menang ronde. Kamu −${damage[me]} HP`}
+                    ? `You win the round. Opponent −${damage[them]} HP`
+                    : `Opponent wins the round. You −${damage[me]} HP`}
             </motion.p>
           ) : (
-            <motion.span key="vs" exit={{ opacity: 0 }} className="relative rounded-full bg-ink px-3 font-display text-sm text-paper/60">
+            <motion.span key="vs" exit={{ opacity: 0 }} className="relative rounded-full bg-black/60 px-3 font-display text-sm text-snow/70">
               VS
             </motion.span>
           )}
@@ -298,9 +338,9 @@ function RevealSequence({ result, me, skins, names, instant, onImpact, footer }:
               setFx(null);
               setBeat(beats.length - 1);
             }}
-            className="text-sm text-paper/50 underline-offset-4 hover:text-paper hover:underline"
+            className="text-sm text-snow/50 underline-offset-4 hover:text-snow hover:underline"
           >
-            Lewati animasi
+            Skip animation
           </button>
         )}
       </div>
@@ -343,8 +383,8 @@ export default function Arena({ view, me, skins, onImpact, onContinue }: ArenaPr
   }, [onImpact, result, reduce]);
 
   return (
-    <section ref={ref} className="relative flex sm:min-h-[260px] flex-col justify-center overflow-hidden lg:flex-1 rounded-[22px] p-3 text-paper sm:rounded-[28px] sm:p-5" style={{ background: skinById(skins[me]).board }}>
-      <svg className="pointer-events-none absolute -right-24 -bottom-24 size-80 text-paper/[0.06]" viewBox="0 0 100 100" aria-hidden>
+    <section ref={ref} className="relative flex sm:min-h-[260px] flex-col justify-center overflow-hidden lg:flex-1 rounded-[22px] p-3 text-snow sm:rounded-[28px] sm:p-5" style={{ background: skinById(skins[me]).board }}>
+      <svg className="pointer-events-none absolute -right-24 -bottom-24 size-80 text-snow/[0.06]" viewBox="0 0 100 100" aria-hidden>
         <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" />
         <circle cx="50" cy="50" r="34" fill="none" stroke="currentColor" strokeDasharray="2 3" />
         <circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" />
@@ -357,23 +397,23 @@ export default function Arena({ view, me, skins, onImpact, onContinue }: ArenaPr
               <SkinContext.Provider value={skinById(skins[them])}>
                 <Row cards={players[them].played!} faceDown />
               </SkinContext.Provider>
-              <p className="text-sm text-paper/60">Lawan udah kunci {players[them].played!.length} kartu</p>
+              <p className="text-sm text-snow/60">Opponent locked in {players[them].played!.length} card{players[them].played!.length === 1 ? "" : "s"}</p>
             </div>
           ) : (
-            <Slots text={players[them].isBot ? "Bot lagi mikir…" : "Lawan lagi milih kartu…"} />
+            <Slots text={players[them].isBot ? "Bot is thinking…" : "Opponent is picking cards…"} />
           )}
-          <div className="h-px bg-paper/15" />
+          <div className="h-px bg-snow/15" />
           {players[me].played ? (
             <div className="flex flex-col items-center gap-2">
               <SkinContext.Provider value={skinById(skins[me])}>
                 <Row cards={players[me].played!} layout />
               </SkinContext.Provider>
-              <p className="flex items-center gap-2 text-sm text-paper/60">
-                <span className="animate-pulse-dot size-1.5 rounded-full bg-signal" /> Kartumu terkunci. Nunggu lawan…
+              <p className="flex items-center gap-2 text-sm text-snow/60">
+                <span className="animate-pulse-dot size-1.5 rounded-full bg-signal" /> Your cards are locked in. Waiting for your opponent…
               </p>
             </div>
           ) : (
-            <Slots text="Pilih 1–5 kartu di bawah, lalu tekan Main" />
+            <Slots text="Pick 1–5 cards below, then press Play" />
           )}
         </div>
       )}
@@ -386,16 +426,17 @@ export default function Arena({ view, me, skins, onImpact, onContinue }: ArenaPr
           skins={skins}
           names={names}
           instant={phase.kind === "gameOver"}
+          shutdown={phase.kind === "reveal" ? roundCallout(view.log) : null}
           onImpact={impact}
           footer={(done) =>
             phase.kind === "reveal" && done ? (
               phase.ready[me] ? (
-                <p className="flex items-center gap-2 text-sm text-paper/70">
-                  <span className="animate-pulse-dot size-1.5 rounded-full bg-signal" /> Nunggu lawan siap…
+                <p className="flex items-center gap-2 text-sm text-snow/70">
+                  <span className="animate-pulse-dot size-1.5 rounded-full bg-signal" /> Waiting for your opponent…
                 </p>
               ) : (
                 <PrimaryButton tone="red" autoFocus onClick={onContinue}>
-                  Lanjut
+                  Continue
                 </PrimaryButton>
               )
             ) : null

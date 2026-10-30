@@ -5,6 +5,7 @@ import { useEffect, useMemo } from "react";
 import { createRng, type Card } from "@/lib/cards";
 import { play } from "@/lib/sound";
 import { useSkin } from "@/lib/skins";
+import Callout from "./Callout";
 import CardArt from "./CardArt";
 import { WIN_THEME, WinScene } from "./SkinFx";
 import type { RankNote } from "./Game";
@@ -20,6 +21,8 @@ interface Props {
   rankNote: RankNote | null;
   /** The winning hand, fanned out behind the title. */
   playedCards: Card[];
+  /** Legendary or Epic comeback, when the match earned one. */
+  callout?: { kind: "legendary" | "comeback"; detail: string } | null;
 }
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
@@ -75,27 +78,29 @@ function Letters({ text, delay }: { text: string; delay: number }) {
   );
 }
 
-export default function GameOver({ outcome, round, hp, onRestart, onExit, restartLabel, rankNote, playedCards }: Props) {
+export default function GameOver({ outcome, round, hp, onRestart, onExit, restartLabel, rankNote, playedCards, callout }: Props) {
   const reduce = useReducedMotion();
   const win = outcome === "win";
   // When you win, the screen is dressed in your skin. Only you see it.
   const skin = useSkin();
   const theme = WIN_THEME[skin.id];
 
+  const calloutKind = callout?.kind;
   useEffect(() => {
     const timers = [setTimeout(() => play(win ? "win" : outcome === "lose" ? "lose" : "block"), 450)];
-    if (rankNote?.kind === "star") timers.push(setTimeout(() => play("joker"), 1500));
+    if (calloutKind) timers.push(setTimeout(() => play(calloutKind), 1250));
+    if (rankNote?.kind === "star") timers.push(setTimeout(() => play("joker"), calloutKind ? 2600 : 1500));
     return () => timers.forEach(clearTimeout);
-  }, [win, outcome, rankNote]);
+  }, [win, outcome, rankNote, calloutKind]);
 
-  const title = win ? "MENANG" : outcome === "lose" ? "KALAH" : "SERI";
+  const title = win ? "VICTORY" : outcome === "lose" ? "DEFEAT" : "DRAW";
   const fan = playedCards.slice(0, 5);
 
   return (
     <motion.div
       role="dialog"
       aria-modal="true"
-      aria-label={win ? "Kamu menang" : outcome === "lose" ? "Kamu kalah" : "Seri"}
+      aria-label={win ? "You won" : outcome === "lose" ? "You lost" : "Draw"}
       className={`fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden p-6 text-center ${
         win ? "" : "bg-concrete/90 text-ink backdrop-blur-md backdrop-grayscale"
       }`}
@@ -129,6 +134,17 @@ export default function GameOver({ outcome, round, hp, onRestart, onExit, restar
         </div>
       )}
 
+      {callout && (
+        <motion.div
+          className="relative mb-4 w-full max-w-3xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 0.01 }}
+        >
+          <Callout kind={callout.kind} detail={callout.detail} />
+        </motion.div>
+      )}
+
       <motion.div
         className="relative"
         animate={outcome === "lose" && !reduce ? { transform: ["translateX(0px)", "translateX(-10px)", "translateX(8px)", "translateX(-4px)", "translateX(0px)"] } : undefined}
@@ -159,13 +175,13 @@ export default function GameOver({ outcome, round, hp, onRestart, onExit, restar
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3, delay: 1.2 }}
       >
-        Selesai di ronde {round}. HP akhir: kamu {hp[0]}, lawan {hp[1]}.
+        Ended in round {round}. Final HP: you {hp[0]}, opponent {hp[1]}.
       </motion.p>
 
       {rankNote && (
         <motion.p
           className={`relative mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${
-            rankNote.kind === "star" ? "bg-paper text-ink" : win ? "bg-ink/20" : "bg-paper"
+            rankNote.kind === "star" ? "bg-paper text-ink" : win ? "bg-black/20" : "bg-paper"
           }`}
           initial={reduce ? { opacity: 0 } : { opacity: 0, transform: "scale(0.6) rotate(-10deg)" }}
           animate={{ opacity: 1, transform: "scale(1) rotate(0deg)" }}
@@ -186,7 +202,7 @@ export default function GameOver({ outcome, round, hp, onRestart, onExit, restar
           {restartLabel}
         </PrimaryButton>
         <SecondaryButton onClick={onExit} className="text-base">
-          Ke menu
+          Main menu
         </SecondaryButton>
       </motion.div>
     </motion.div>

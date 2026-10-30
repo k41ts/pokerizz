@@ -20,7 +20,7 @@ function EffectPreview({ skin, onClose }: { skin: Skin; onClose: () => void }) {
     <motion.div
       role="dialog"
       aria-modal="true"
-      aria-label={`Efek skin ${skin.name}`}
+      aria-label={`${skin.name} skin effects`}
       className="fixed inset-0 z-[60] flex cursor-pointer flex-col items-center justify-center gap-4 overflow-hidden p-6 text-center"
       style={{ background: theme.bg, color: theme.text }}
       initial={{ opacity: 0 }}
@@ -35,10 +35,10 @@ function EffectPreview({ skin, onClose }: { skin: Skin; onClose: () => void }) {
         className="relative font-display text-[clamp(2.6rem,13vw,6rem)] leading-none"
         style={skin.id === "neon" ? { textShadow: "0 0 18px #22d3ee, 0 0 42px #f472b6" } : undefined}
       >
-        MENANG
+        VICTORY
       </p>
       <p className="relative text-base" style={{ color: theme.muted }}>
-        Skin {skin.name}. Ketuk di mana aja buat tutup.
+        {skin.name} skin. Tap anywhere to close.
       </p>
     </motion.div>
   );
@@ -66,7 +66,7 @@ export default function SkinShop({ open, onClose, profile, onChanged, onSignIn }
     const ok = owned ? await equipSkin(id) : await buySkin(id);
     setBusy(null);
     if (!ok) {
-      setError(owned ? "Gagal pasang skin. Coba lagi." : "Poinmu belum cukup.");
+      setError(owned ? "Couldn't equip the skin. Try again." : "Not enough points yet.");
       return;
     }
     play(owned ? "select" : "joker");
@@ -74,11 +74,11 @@ export default function SkinShop({ open, onClose, profile, onChanged, onSignIn }
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Skin kartu">
+    <Sheet open={open} onClose={onClose} title="Card skins">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-base text-ink/70">Lawanmu lihat skin kartumu selama main.</p>
+        <p className="text-base text-ink/70">Your opponent sees your card skin while you play.</p>
         {profile && (
-          <p className="rounded-full bg-ink px-4 py-1.5 font-display text-sm text-paper tabular-nums">{profile.points} poin</p>
+          <p className="rounded-full bg-ink px-4 py-1.5 font-display text-sm text-paper tabular-nums">{profile.points} points</p>
         )}
       </div>
       {error && (
@@ -117,23 +117,23 @@ export default function SkinShop({ open, onClose, profile, onChanged, onSignIn }
                 }}
                 className="press text-sm font-semibold text-ink/70 underline underline-offset-4 hover:text-ink"
               >
-                Lihat efek
+                Preview effects
               </button>
               <button
                 type="button"
                 disabled={busy !== null || equipped || (!owned && !!profile && !affordable)}
                 onClick={() => void act(id)}
                 className={`press mt-auto rounded-full px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
-                  equipped ? "bg-paper text-ink" : owned ? "bg-ink text-paper" : "bg-signal text-paper"
+                  equipped ? "bg-paper text-ink" : owned ? "bg-ink text-paper" : "bg-signal text-snow"
                 }`}
               >
-                {busy === id ? "Sebentar…" : equipped ? "Dipakai" : owned ? "Pakai" : `${skin.price} poin`}
+                {busy === id ? "One moment…" : equipped ? "Equipped" : owned ? "Equip" : `${skin.price} points`}
               </button>
             </li>
           );
         })}
       </ul>
-      <p className="mt-4 text-sm text-ink/60">Dapat poin dari main ranked pakai akun: menang +30, kalah +10.</p>
+      <p className="mt-4 text-sm text-ink/60">Earn points from ranked and friend matches: +30 for a win, +10 for a loss.</p>
       {/* Portal: the sheet panel is transformed, which would trap a fixed overlay inside it. */}
       {typeof document !== "undefined" &&
         createPortal(

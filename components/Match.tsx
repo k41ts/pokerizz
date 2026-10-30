@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { finishBotMatch, reportLoss, startBotMatch } from "@/lib/account";
+import { finishBotMatch, recordMatchStats, reportLoss, startBotMatch } from "@/lib/account";
 import { botMove, chooseJoker, type BotLevel } from "@/lib/bot";
 import { createGame, gameReducer, viewFor, type GameAction, type GameState, type PlayerIndex } from "@/lib/game";
 import { send, type Link } from "@/lib/net";
@@ -13,6 +13,15 @@ import { PrimaryButton } from "./ui";
 const TRAINING_DELAY = 900;
 /** Extra time the host allows the guest before playing a card for them. */
 const GUEST_GRACE = 4;
+
+/** What a finished match adds toward achievements, for player `me`. */
+function statsFor(view: GameState, me: PlayerIndex, winner: PlayerIndex | null) {
+  const other: PlayerIndex = me === 0 ? 1 : 0;
+  return {
+    fullHouses: view.players[me].history.full_house ?? 0,
+    flawless: winner === me && !(view.log ?? []).includes(other),
+  };
+}
 
 function newSeed() {
   return Math.floor(Math.random() * 2 ** 32);
@@ -36,6 +45,7 @@ export type BotOpponent =
 export function BotMatch({
   name,
   skin,
+  title,
   opponent,
   onExit,
   onSearchAgain,
@@ -44,6 +54,7 @@ export function BotMatch({
 }: {
   name: string;
   skin: string;
+  title: string | null;
   opponent: BotOpponent;
   onExit: () => void;
   onSearchAgain?: () => void;
@@ -69,7 +80,7 @@ export function BotMatch({
     let act: (() => void) | null = null;
     let delay = TRAINING_DELAY;
     if (phase.kind === "turn" && !bot.played) {
-      const move = botMove(bot.hand, bot.jokers, bot.discardsLeft, bot.deck, level);
+      const move = botMove(bot.hand, bot.jokers, bot.discardsLeft, bot.deck, level, state.effect);
       // Ranked bots take human-like time, always inside the turn timer.
       if (ranked) delay = move.kind === "discard" ? between(1500, 3000) : between(2500, 6500);
       act = () => dispatch({ type: move.kind, player: 1, cardIds: move.cards.map((c) => c.id) });
@@ -82,7 +93,7 @@ export function BotMatch({
     if (!act) return;
     const t = setTimeout(act, delay);
     return () => clearTimeout(t);
-  }, [phase, bot, level, ranked]);
+  }, [phase, bot, level, ranked, state.effect]);
 
   // Ranked: register the match when it starts, report the result when it ends.
   const matchId = useRef<Promise<string | null> | null>(resume?.botMatchId ? Promise.resolve(resume.botMatchId) : null);
@@ -108,22 +119,26 @@ export function BotMatch({
     if (!ranked) return;
     if (!signedIn) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- result text for this game
-      setNote({ kind: "unranked", text: "Masuk akun biar menang dapat bintang dan poin." });
+      setNote({ kind: "unranked", text: "Sign in to earn stars and points from wins." });
       return;
     }
     const pending = matchId.current;
     matchId.current = null;
     if (winner === null || !pending) {
-      setNote({ kind: "unranked", text: "Seri, ga ada bintang." });
+      setNote({ kind: "unranked", text: "Draw, no stars." });
       return;
     }
+    const stats = statsFor(state, 0, winner);
     void pending.then(async (id) => {
       const delta = id ? await finishBotMatch(id, winner === 0) : null;
-      if (delta === null) setNote({ kind: "unranked", text: "Game ini ga dihitung (terlalu singkat atau batas harian)." });
-      else if (winner === 0) setNote({ kind: "star", text: "+1 bintang · +30 poin" });
-      else setNote({ kind: "loss", text: delta < 0 ? "−1 bintang · +10 poin" : "+10 poin" });
+      if (id && delta !== null) await recordMatchStats(id, stats.fullHouses, stats.flawless);
+      if (delta === null) setNote({ kind: "unranked", text: "This game didn't count (too short, or daily limit reached)." });
+      else if (winner === 0) setNote({ kind: "star", text: "+1 star · +30 points" });
+      else setNote({ kind: "loss", text: delta < 0 ? "−1 star · +10 points" : "+10 points" });
       onRanked?.();
     });
+    // Stats are read once, when the match ends.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner, ranked, signedIn, onRanked]);
 
   return (
@@ -136,10 +151,11 @@ export function BotMatch({
         setNote(null);
         dispatch({ type: "reset", state: newGame() });
       }}
-      restartLabel={ranked ? "Cari lawan lagi" : "Main lagi"}
+      restartLabel={ranked ? "Find another match" : "Play again"}
       onExit={onExit}
       rankNote={note}
       skins={[skin, ranked ? opponent.skin : "classic"]}
+      titles={[title, null]}
       turnSeconds={ranked ? TURN_SECONDS : undefined}
     />
   );
@@ -149,6 +165,7 @@ interface Meta {
   matchId: string;
   userIds: [string | null, string | null];
   skins: [string, string];
+  titles: [string | null, string | null];
 }
 
 /**
@@ -164,20 +181,30 @@ function useRankNote(view: GameState | null, me: PlayerIndex, meta: Meta | null,
   useEffect(() => {
     if (winner === undefined || !meta || !ranked || reported.current === meta.matchId) return;
     reported.current = meta.matchId;
-    if (winner === null) return;
+    const stats = statsFor(view!, me, winner);
+    const record = () => recordMatchStats(meta.matchId, stats.fullHouses, stats.flawless);
+    if (winner === null) {
+      void record().then(onRanked);
+      return;
+    }
     if (winner !== me) {
-      void reportLoss(meta.matchId, meta.userIds[winner]!).then(onRanked);
+      void reportLoss(meta.matchId, meta.userIds[winner]!)
+        .then(record)
+        .then(onRanked);
     } else {
+      void record();
       // The other device reports; give it a moment before reloading our stars.
       const t = setTimeout(onRanked, 2500);
       return () => clearTimeout(t);
     }
+    // Stats are read once, when the match ends.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner, meta, ranked, me, onRanked]);
 
   if (winner === undefined) return null;
-  if (!ranked) return { kind: "unranked", text: "Main pakai akun berdua biar menang dapat bintang dan poin." };
-  if (winner === null) return { kind: "unranked", text: "Seri, ga ada bintang." };
-  return winner === me ? { kind: "star", text: "+1 bintang · +30 poin" } : { kind: "loss", text: "−1 bintang · +10 poin" };
+  if (!ranked) return { kind: "unranked", text: "Both players need an account for wins to earn stars and points." };
+  if (winner === null) return { kind: "unranked", text: "Draw, no stars." };
+  return winner === me ? { kind: "star", text: "+1 star · +30 points" } : { kind: "loss", text: "−1 star · +10 points" };
 }
 
 function newMatchId() {
@@ -192,14 +219,14 @@ function LinkBanner({ status, onExit }: { status: LinkStatus; onExit: () => void
       <div>
         <p className="flex items-center gap-2 font-semibold">
           {!gone && <span className="animate-pulse-dot size-2 rounded-full bg-signal" />}
-          {gone ? "Lawanmu keluar dari game" : "Lawanmu lagi ga nyambung"}
+          {gone ? "Your opponent left the game" : "Your opponent lost connection"}
         </p>
         <p className="text-sm text-paper/60">
-          {gone ? "Cari lawan atau bikin room baru buat main lagi." : "Game lanjut otomatis kalau dia balik. Atau keluar ke menu."}
+          {gone ? "Find a match or open a new room to play again." : "The game carries on if they come back. Or head to the menu."}
         </p>
       </div>
       <PrimaryButton tone="red" onClick={onExit}>
-        Ke menu
+        Main menu
       </PrimaryButton>
     </div>
   );
@@ -261,6 +288,7 @@ export function HostMatch({
   names,
   userIds,
   skins,
+  titles,
   onExit,
   onRanked,
   resume,
@@ -270,6 +298,7 @@ export function HostMatch({
   names: [string, string];
   userIds: [string | null, string | null];
   skins: [string, string];
+  titles: [string | null, string | null];
   onExit: () => void;
   onRanked: () => void;
   /** The game this host was running before the page reloaded. */
@@ -282,12 +311,12 @@ export function HostMatch({
     dispatch({ type: "reset", state: createGame("online", newSeed(), names) });
     setMatchId(newMatchId());
   }, [names]);
-  const meta = { matchId, userIds, skins };
+  const meta = { matchId, userIds, skins, titles };
   const rankNote = useRankNote(state, 0, meta, onRanked);
 
   useEffect(() => {
-    send(link, { t: "meta", matchId, userIds, skins });
-  }, [link, matchId, userIds, skins]);
+    send(link, { t: "meta", matchId, userIds, skins, titles });
+  }, [link, matchId, userIds, skins, titles]);
 
   // Latest values for resending when the guest asks for a sync.
   const latest = useRef({ state, matchId });
@@ -297,7 +326,7 @@ export function HostMatch({
 
   useEffect(() => {
     const resync = () => {
-      send(link, { t: "meta", matchId: latest.current.matchId, userIds, skins });
+      send(link, { t: "meta", matchId: latest.current.matchId, userIds, skins, titles });
       send(link, { t: "state", state: viewFor(latest.current.state, 1) });
     };
     const offMessage = link.onMessage((msg) => {
@@ -312,7 +341,7 @@ export function HostMatch({
       offMessage();
       offPresence();
     };
-  }, [link, restart, userIds, skins]);
+  }, [link, restart, userIds, skins, titles]);
 
   useEffect(() => {
     send(link, { t: "state", state: viewFor(state, 1) });
@@ -321,8 +350,8 @@ export function HostMatch({
   // Saved on every move, so a reload reopens the room and carries on.
   useEffect(() => {
     if (state.phase.kind === "gameOver") clearMatch();
-    else saveMatch({ kind: "host", code, state, matchId, names, userIds, skins });
-  }, [code, state, matchId, names, userIds, skins]);
+    else saveMatch({ kind: "host", code, state, matchId, names, userIds, skins, titles });
+  }, [code, state, matchId, names, userIds, skins, titles]);
 
   // The guest's own timer plays for them; this backs it up if their device stalls.
   const guestWaiting = state.phase.kind === "turn" && !state.players[1].played;
@@ -348,6 +377,7 @@ export function HostMatch({
         onExit={onExit}
         rankNote={rankNote}
         skins={skins}
+        titles={titles}
         turnSeconds={TURN_SECONDS}
       />
       <LinkBanner status={status} onExit={onExit} />
@@ -378,7 +408,8 @@ export function GuestMatch({ code, link, onExit, onRanked }: { code: string; lin
         }
         setView(msg.state);
       }
-      if (msg.t === "meta") setMeta({ matchId: msg.matchId, userIds: msg.userIds, skins: msg.skins ?? ["classic", "classic"] });
+      if (msg.t === "meta")
+        setMeta({ matchId: msg.matchId, userIds: msg.userIds, skins: msg.skins ?? ["classic", "classic"], titles: msg.titles ?? [null, null] });
     });
     send(link, { t: "sync" });
     // Ask again if the first answer got lost.
@@ -393,7 +424,7 @@ export function GuestMatch({ code, link, onExit, onRanked }: { code: string; lin
     return (
       <main className="grid min-h-dvh place-items-center p-6 text-center">
         <p className="flex items-center gap-2 text-sm text-steel">
-          <span className="animate-pulse-dot size-2 rounded-full bg-signal" /> Nyambung ke room…
+          <span className="animate-pulse-dot size-2 rounded-full bg-signal" /> Connecting to the room…
         </p>
         <LinkBanner status={status} onExit={onExit} />
       </main>
@@ -410,6 +441,7 @@ export function GuestMatch({ code, link, onExit, onRanked }: { code: string; lin
         onExit={onExit}
         rankNote={rankNote}
         skins={meta?.skins ?? ["classic", "classic"]}
+        titles={meta?.titles ?? [null, null]}
         turnSeconds={TURN_SECONDS}
       />
       <LinkBanner status={status} onExit={onExit} />

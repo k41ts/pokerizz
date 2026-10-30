@@ -3,6 +3,7 @@
 import { animate, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { isMuted, onMuteChange, play, setMuted } from "@/lib/sound";
+import { currentTheme, onThemeChange, setTheme } from "@/lib/theme";
 
 export function ArrowIcon({ className = "" }: { className?: string }) {
   return (
@@ -24,7 +25,7 @@ export function Pill({ children, tone = "light", className = "" }: { children: R
   const tones = {
     light: "bg-paper text-ink",
     dark: "bg-ink text-paper",
-    red: "bg-signal text-paper",
+    red: "bg-signal text-snow",
     ghost: "bg-transparent text-ink ring-1 ring-ink/25",
   };
   return (
@@ -50,7 +51,7 @@ export function PrimaryButton({
   autoFocus?: boolean;
   className?: string;
 }) {
-  const bg = tone === "red" ? "bg-signal" : "bg-ink";
+  const colors = tone === "red" ? "bg-signal text-snow" : "bg-ink text-paper";
   return (
     <button
       type="button"
@@ -60,10 +61,10 @@ export function PrimaryButton({
         play("click");
         onClick?.();
       }}
-      className={`press inline-flex items-center gap-3 rounded-full ${bg} py-1.5 pr-1.5 pl-5 text-sm font-semibold text-paper disabled:opacity-35 ${className}`}
+      className={`press inline-flex items-center gap-3 rounded-full ${colors} py-1.5 pr-1.5 pl-5 text-sm font-semibold disabled:opacity-35 ${className}`}
     >
       {children}
-      <span className={`grid size-8 place-items-center rounded-full bg-paper ${tone === "red" ? "text-signal" : "text-ink"}`}>
+      <span className={`grid size-8 place-items-center rounded-full ${tone === "red" ? "bg-snow text-signal" : "bg-paper text-ink"}`}>
         <ChevronsIcon className="size-4" />
       </span>
     </button>
@@ -116,13 +117,40 @@ export function SoundToggle() {
         setMuted(!muted);
         if (muted) play("click");
       }}
-      aria-label={muted ? "Nyalakan suara" : "Matikan suara"}
+      aria-label={muted ? "Turn sound on" : "Turn sound off"}
       aria-pressed={!muted}
       className="press grid size-9 place-items-center rounded-full bg-paper text-ink ring-1 ring-ink/10 hover:bg-panel"
     >
       <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
         {muted ? <path d="m16 9 5 6m0-6-5 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />}
+      </svg>
+    </button>
+  );
+}
+
+export function ThemeToggle() {
+  const theme = useSyncExternalStore(onThemeChange, currentTheme, () => "light" as const);
+  const dark = theme === "dark";
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        play("click");
+        setTheme(dark ? "light" : "dark");
+      }}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      className="press grid size-9 place-items-center rounded-full bg-paper text-ink ring-1 ring-ink/10 hover:bg-panel"
+    >
+      <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {dark ? (
+          <>
+            <circle cx="12" cy="12" r="4" fill="currentColor" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </>
+        ) : (
+          <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" fill="currentColor" />
+        )}
       </svg>
     </button>
   );
@@ -159,7 +187,7 @@ export function AnimatedNumber({ value, className = "" }: { value: number; class
 export function Logo() {
   return (
     <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-ink p-1.5 text-paper sm:pr-4" aria-label="Kartu Duel">
-      <span className="grid size-7 place-items-center rounded-full bg-signal font-display text-[10px]">KD</span>
+      <span className="grid size-7 place-items-center rounded-full bg-signal font-display text-[10px] text-snow">KD</span>
       <span className="font-display text-xs tracking-wide max-sm:hidden">Kartu Duel</span>
     </span>
   );

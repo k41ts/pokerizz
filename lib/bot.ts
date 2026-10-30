@@ -1,5 +1,6 @@
 import type { Card, Suit } from "./cards";
 import type { HandType } from "./hands";
+import type { EffectId } from "./effects";
 import type { JokerId } from "./jokers";
 import { scorePlay, type PlayScore } from "./scoring";
 import { JOKER_SLOTS, MAX_SELECT } from "./game";
@@ -17,10 +18,10 @@ function* subsets(cards: Card[], maxSize: number): Generator<Card[]> {
 }
 
 /** Highest-scoring play; ties go to the play using fewer cards. */
-export function chooseBestPlay(hand: Card[], jokers: JokerId[]): { cards: Card[]; score: PlayScore } {
+export function chooseBestPlay(hand: Card[], jokers: JokerId[], effect?: EffectId): { cards: Card[]; score: PlayScore } {
   let best: { cards: Card[]; score: PlayScore } | null = null;
   for (const cards of subsets(hand, MAX_SELECT)) {
-    const score = scorePlay(cards, jokers)!;
+    const score = scorePlay(cards, jokers, effect)!;
     if (
       !best ||
       score.total > best.score.total ||
@@ -33,9 +34,9 @@ export function chooseBestPlay(hand: Card[], jokers: JokerId[]): { cards: Card[]
 }
 
 /** Cards to throw away, or null to stop discarding. */
-export function chooseDiscard(hand: Card[], jokers: JokerId[], discardsLeft: number): Card[] | null {
+export function chooseDiscard(hand: Card[], jokers: JokerId[], discardsLeft: number, effect?: EffectId): Card[] | null {
   if (discardsLeft <= 0) return null;
-  const best = chooseBestPlay(hand, jokers);
+  const best = chooseBestPlay(hand, jokers, effect);
   if (best.score.base >= GOOD_ENOUGH) return null;
 
   // Keep the best combo plus the most common suit if it's a flush draw.
@@ -53,7 +54,7 @@ export function chooseDiscard(hand: Card[], jokers: JokerId[], discardsLeft: num
 }
 
 /**
- * 0 Pemula … 4 Berlian. Higher levels never see hidden information: they only know
+ * 0 Rookie … 4 Diamond. Higher levels never see hidden information: they only know
  * which cards are left in their own deck, not in what order.
  */
 export type BotLevel = 0 | 1 | 2 | 3 | 4;
@@ -118,10 +119,10 @@ function sample<T>(pool: T[], n: number): T[] {
 }
 
 /** Average best score after keeping `keep` and drawing the rest from `pool`. */
-function expectedBest(keep: Card[], pool: Card[], handSize: number, jokers: JokerId[], samples: number): number {
+function expectedBest(keep: Card[], pool: Card[], handSize: number, jokers: JokerId[], samples: number, effect?: EffectId): number {
   const need = handSize - keep.length;
   let total = 0;
-  for (let i = 0; i < samples; i++) total += chooseBestPlay([...keep, ...sample(pool, need)], jokers).score.total;
+  for (let i = 0; i < samples; i++) total += chooseBestPlay([...keep, ...sample(pool, need)], jokers, effect).score.total;
   return total / samples;
 }
 
@@ -129,8 +130,15 @@ function expectedBest(keep: Card[], pool: Card[], handSize: number, jokers: Joke
  * One decision for a bot: discard (it will be asked again) or play.
  * `pool` is the cards the bot could draw: its own deck, order unknown.
  */
-export function botMove(hand: Card[], jokers: JokerId[], discardsLeft: number, pool: Card[], level: BotLevel): BotMove {
-  const best = chooseBestPlay(hand, jokers);
+export function botMove(
+  hand: Card[],
+  jokers: JokerId[],
+  discardsLeft: number,
+  pool: Card[],
+  level: BotLevel,
+  effect?: EffectId,
+): BotMove {
+  const best = chooseBestPlay(hand, jokers, effect);
 
   if (level === 0) {
     // Beginners often miss their best hand.
@@ -142,7 +150,7 @@ export function botMove(hand: Card[], jokers: JokerId[], discardsLeft: number, p
   }
   if (level === 1 || discardsLeft <= 0) return { kind: "play", cards: best.cards };
   if (level === 2 || Math.random() >= DEEP_CHANCE[level]) {
-    const toss = chooseDiscard(hand, jokers, discardsLeft);
+    const toss = chooseDiscard(hand, jokers, discardsLeft, effect);
     return toss ? { kind: "discard", cards: toss } : { kind: "play", cards: best.cards };
   }
 
@@ -152,7 +160,7 @@ export function botMove(hand: Card[], jokers: JokerId[], discardsLeft: number, p
   let bestValue = baseline + MARGIN[level];
   for (const keep of keepCandidates(hand, best.cards)) {
     if (keep.length >= hand.length) continue;
-    const value = expectedBest(keep, pool, hand.length, jokers, SAMPLES[level]);
+    const value = expectedBest(keep, pool, hand.length, jokers, SAMPLES[level], effect);
     if (value > bestValue) {
       bestValue = value;
       bestKeep = keep;

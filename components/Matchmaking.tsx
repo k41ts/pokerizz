@@ -6,6 +6,7 @@ import { findMatch, type MatchFound, type Seeker } from "@/lib/matchmaking";
 import { skinById } from "@/lib/skins";
 import { play } from "@/lib/sound";
 import CardArt from "./CardArt";
+import { TitleBadge } from "./TitleBadge";
 import { SecondaryButton } from "./ui";
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
@@ -18,7 +19,11 @@ interface Props {
 
 function opponentName(match: MatchFound): string {
   if (match.kind === "bot") return match.name;
-  return match.connected.role === "host" ? match.connected.names[1] : "Lawan";
+  return match.connected.role === "host" ? match.connected.names[1] : "Opponent";
+}
+
+function opponentTitle(match: MatchFound): string | null {
+  return match.kind === "human" && match.connected.role === "host" ? match.connected.titles[1] : null;
 }
 
 function opponentSkin(match: MatchFound): string {
@@ -83,19 +88,18 @@ export default function Matchmaking({ me, onFound, onCancel }: Props) {
             </motion.div>
           </div>
           <div>
-            <h1 className="font-display text-2xl">Nyari lawan…</h1>
-            <p className="mt-2 text-base text-ink/60 tabular-nums">{seconds} detik</p>
-            {!me.userId && <p className="mt-3 text-sm text-ink/60">Kamu main sebagai tamu. Masuk akun biar menang dapat bintang dan poin.</p>}
-          </div>
+            <h1 className="font-display text-2xl">Finding an opponent…</h1>
+            <p className="mt-2 text-base text-ink/60 tabular-nums">{seconds}s</p>
+                      </div>
           <SecondaryButton onClick={onCancel} className="text-base">
-            Batal
+            Cancel
           </SecondaryButton>
         </>
       ) : (
         <div className="flex w-full items-center justify-center gap-4 sm:gap-8">
           {[
-            { name: me.name, skin: me.skin, from: -1 },
-            { name: opponentName(found), skin: opponentSkin(found), from: 1 },
+            { name: me.name, skin: me.skin, title: me.title, from: -1 },
+            { name: opponentName(found), skin: opponentSkin(found), title: opponentTitle(found), from: 1 },
           ].map((side, i) => (
             <motion.div
               key={i}
@@ -108,6 +112,7 @@ export default function Matchmaking({ me, onFound, onCancel }: Props) {
                 <CardArt faceDown skin={skinById(side.skin)} />
               </div>
               <p className="max-w-32 truncate font-display text-base">{side.name}</p>
+              {side.title && <TitleBadge id={side.title} />}
             </motion.div>
           ))}
           <motion.span

@@ -6,6 +6,8 @@ import type { PlayerState } from "@/lib/game";
 import { JOKERS } from "@/lib/jokers";
 import { JOKER_SLOTS } from "@/lib/game";
 import { MAX_HP } from "@/lib/scoring";
+import JokerIcon from "./JokerIcon";
+import { TitleBadge } from "./TitleBadge";
 import { AnimatedNumber, Pill } from "./ui";
 
 /**
@@ -57,9 +59,11 @@ interface Props {
   isYou: boolean;
   status?: React.ReactNode;
   impact?: Impact | null;
+  /** Achievement title the player shows off, if any. */
+  title?: string | null;
 }
 
-export default function PlayerPanel({ player, hp, isYou, status, impact }: Props) {
+export default function PlayerPanel({ player, hp, isYou, status, impact, title }: Props) {
   const ref = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
 
@@ -84,7 +88,7 @@ export default function PlayerPanel({ player, hp, isYou, status, impact }: Props
       <div className="sm:hidden">
         <div className="flex items-center gap-3">
           <div className="w-20 min-w-0 shrink-0">
-            <p className="text-xs text-steel">{isYou ? "Kamu" : "Lawan"}</p>
+            <p className="text-xs text-steel">{isYou ? "You" : "Opponent"}</p>
             <p className="truncate font-display text-sm leading-tight">{player.isBot ? "Bot" : player.name}</p>
           </div>
           <HealthBar hp={hp} size="sm" />
@@ -92,12 +96,13 @@ export default function PlayerPanel({ player, hp, isYou, status, impact }: Props
             <AnimatedNumber value={hp} />
           </span>
         </div>
+        {title && <TitleBadge id={title} className="mt-1.5" />}
         {(player.jokers.length > 0 || status) && (
           <div className="mt-2 flex items-center justify-between gap-2 text-sm">
             <span className="flex gap-1" aria-label="Joker">
               {player.jokers.map((id) => (
-                <span key={id} title={`${JOKERS[id].name}: ${JOKERS[id].description}`} className="grid size-7 place-items-center rounded-lg bg-ink">
-                  {JOKERS[id].icon}
+                <span key={id} title={`${JOKERS[id].name}: ${JOKERS[id].description}`}>
+                  <JokerIcon id={id} className="size-7" />
                 </span>
               ))}
             </span>
@@ -109,14 +114,15 @@ export default function PlayerPanel({ player, hp, isYou, status, impact }: Props
       <div className="max-sm:hidden">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm text-steel">{isYou ? "Kamu" : "Lawan"}</p>
+            <p className="text-sm text-steel">{isYou ? "You" : "Opponent"}</p>
             <h2 className="font-display text-base leading-tight">{player.isBot ? "Bot" : player.name}</h2>
+            {title && <TitleBadge id={title} className="mt-1.5" />}
           </div>
           <div className="text-right">
             <div className={`font-display text-5xl leading-none ${hp <= 25 ? "text-signal" : ""}`}>
               <AnimatedNumber value={hp} />
             </div>
-            <p className="mt-1 text-sm text-steel">HP dari {MAX_HP}</p>
+            <p className="mt-1 text-sm text-steel">HP of {MAX_HP}</p>
           </div>
         </div>
         <div className="mt-4">
@@ -127,13 +133,13 @@ export default function PlayerPanel({ player, hp, isYou, status, impact }: Props
             const id = player.jokers[i];
             return id ? (
               <span key={id} title={JOKERS[id].description}>
-                <Pill tone="dark">
-                  <span aria-hidden>{JOKERS[id].icon}</span> {JOKERS[id].name}
+                <Pill tone="dark" className="py-0.5 pl-0.5">
+                  <JokerIcon id={id} className="size-6" /> {JOKERS[id].name}
                 </Pill>
               </span>
             ) : (
               <Pill key={i} tone="ghost" className="text-ink/40">
-                Slot Joker kosong
+                Empty Joker slot
               </Pill>
             );
           })}
@@ -156,7 +162,7 @@ export default function PlayerPanel({ player, hp, isYou, status, impact }: Props
       )}
       {impact && impact.blocked > 0 && (
         <div key={`b${impact.id}`} className="animate-float-up pointer-events-none absolute top-14 right-6 text-sm font-semibold [animation-delay:200ms]">
-          🛡️ tahan {impact.blocked}
+          Shield blocked {impact.blocked}
         </div>
       )}
     </section>

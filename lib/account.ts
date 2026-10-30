@@ -12,9 +12,14 @@ export interface Profile {
   points: number;
   skins: string[];
   skin: string;
+  /** Achievement titles earned, and the one shown in matches. */
+  titles: string[];
+  title: string | null;
+  full_houses: number;
+  flawless_wins: number;
 }
 
-const PROFILE_COLUMNS = "id, username, stars, wins, losses, points, skins, skin";
+const PROFILE_COLUMNS = "id, username, stars, wins, losses, points, skins, skin, titles, title, full_houses, flawless_wins";
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -39,29 +44,29 @@ export class AccountError extends Error {}
 
 export async function signUp(username: string, password: string) {
   const sb = supabase();
-  if (!sb) throw new AccountError("Akun belum tersedia di server ini.");
+  if (!sb) throw new AccountError("Accounts aren't available on this server.");
   const name = username.trim().toLowerCase();
-  if (!USERNAME_RULE.test(name)) throw new AccountError("Username 3–16 karakter: huruf kecil, angka, atau _.");
-  if (password.length < 6) throw new AccountError("Password minimal 6 karakter.");
+  if (!USERNAME_RULE.test(name)) throw new AccountError("Usernames are 3–16 characters: lowercase letters, numbers or _.");
+  if (password.length < 6) throw new AccountError("Passwords need at least 6 characters.");
 
   const { data: free, error: checkError } = await sb.rpc("username_available", { p_username: name });
-  if (checkError) throw new AccountError("Ga bisa nyambung ke server. Coba lagi.");
-  if (!free) throw new AccountError("Username itu udah dipakai. Coba yang lain.");
+  if (checkError) throw new AccountError("Couldn't reach the server. Try again.");
+  if (!free) throw new AccountError("That username is taken. Try another one.");
 
   const { data, error } = await sb.auth.signUp({
     email: emailFor(name),
     password,
     options: { data: { username: name } },
   });
-  if (error) throw new AccountError(error.message.includes("already") ? "Username itu udah dipakai." : "Gagal bikin akun. Coba lagi.");
-  if (!data.session) throw new AccountError("Akun dibuat, tapi server masih minta verifikasi email. Admin perlu matiin \"Confirm email\" di Supabase.");
+  if (error) throw new AccountError(error.message.includes("already") ? "That username is taken." : "Couldn't create the account. Try again.");
+  if (!data.session) throw new AccountError("Account created, but the server still asks for email confirmation. An admin needs to turn off \"Confirm email\" in Supabase.");
 }
 
 export async function signIn(username: string, password: string) {
   const sb = supabase();
-  if (!sb) throw new AccountError("Akun belum tersedia di server ini.");
+  if (!sb) throw new AccountError("Accounts aren't available on this server.");
   const { error } = await sb.auth.signInWithPassword({ email: emailFor(username.trim()), password });
-  if (error) throw new AccountError("Username atau password salah.");
+  if (error) throw new AccountError("Wrong username or password.");
 }
 
 export async function signOut() {
@@ -113,6 +118,21 @@ export async function finishBotMatch(matchId: string, won: boolean): Promise<num
   return error || data === null || data === undefined ? null : Number(data);
 }
 
+/** Full Houses played and whether the player won without losing HP, once per match. */
+export async function recordMatchStats(matchId: string, fullHouses: number, flawless: boolean): Promise<void> {
+  await supabase()?.rpc("record_match_stats", { p_match_id: matchId, p_full_houses: fullHouses, p_flawless: flawless });
+}
+
+/** Grants any titles the player now qualifies for (such as being #1 on the leaderboard). */
+export async function claimTitles(): Promise<void> {
+  await supabase()?.rpc("claim_titles");
+}
+
+export async function equipTitle(title: string | null): Promise<boolean> {
+  const { data, error } = (await supabase()?.rpc("equip_title", { p_title: title })) ?? {};
+  return !error && data === true;
+}
+
 export interface Tier {
   name: string;
   min: number;
@@ -120,11 +140,11 @@ export interface Tier {
 }
 
 const TIERS: Tier[] = [
-  { name: "Pemula", min: 0, next: 5 },
-  { name: "Perunggu", min: 5, next: 15 },
-  { name: "Perak", min: 15, next: 30 },
-  { name: "Emas", min: 30, next: 50 },
-  { name: "Berlian", min: 50, next: null },
+  { name: "Rookie", min: 0, next: 5 },
+  { name: "Bronze", min: 5, next: 15 },
+  { name: "Silver", min: 15, next: 30 },
+  { name: "Gold", min: 30, next: 50 },
+  { name: "Diamond", min: 50, next: null },
 ];
 
 export function tierIndex(stars: number): number {
@@ -154,6 +174,7 @@ export function useAccount() {
 
   const userId = session?.user.id ?? null;
   const refresh = useCallback(async () => {
+    if (userId) await claimTitles();
     setProfile(userId ? await fetchProfile(userId) : null);
   }, [userId]);
 
