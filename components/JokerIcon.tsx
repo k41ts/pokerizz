@@ -18,7 +18,7 @@ const INK = "#141013";
 const IVORY = "#f3ead6";
 const BONE = "#f4efe4";
 const CRIMSON = "#a3121f";
-const WINE = "#3d0b10";
+const WINE = "#2a070b";
 const GOLD = "#d9a93a";
 const GOLD_DARK = "#8a6418";
 
@@ -74,7 +74,28 @@ function Fan({ cards }: { cards: [string, string][] }) {
 }
 
 /** The jester: two-tone hat with gold bells, pale grinning face, gold-trimmed dark coat. */
-function Jester({ vampire, grad }: { vampire: boolean; grad: string }) {
+// Mouth: upper lip from corner to corner, lower lip back.
+const MOUTH = "M37.6 61 Q40.5 63 42 65 Q50 72.4 58 65 Q59.5 63 62.4 61 Q60.5 66.8 57.6 69.6 Q50 76 42.4 69.6 Q39.5 66.8 37.6 61 Z";
+
+/** Points along a quadratic curve, for a row of teeth that follows the lip. */
+function teethRow(p0: [number, number], c: [number, number], p1: [number, number], n: number, depth: number): string {
+  const at = (t: number) => [
+    (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * c[0] + t ** 2 * p1[0],
+    (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * c[1] + t ** 2 * p1[1],
+  ];
+  const pts: string[] = [];
+  for (let i = 0; i <= n * 2; i++) {
+    const [x, y] = at(i / (n * 2));
+    pts.push(`${x.toFixed(2)} ${(i % 2 ? y + depth : y).toFixed(2)}`);
+  }
+  return `M${pts.join(" L")} Z`;
+}
+
+const UPPER_TEETH = teethRow([40.6, 63.6], [50, 73.4], [59.4, 63.6], 9, 2.4);
+const LOWER_TEETH = teethRow([42.4, 69], [50, 75.4], [57.6, 69], 7, -1.9);
+
+function Jester({ vampire, ids }: { vampire: boolean; ids: { gold: string; skin: string; eyeGlow: string } }) {
+  const eye = vampire ? "#ff2338" : "#ffd23a";
   return (
     <>
       {/* Coat with a high collar and gold trim. */}
@@ -88,6 +109,8 @@ function Jester({ vampire, grad }: { vampire: boolean; grad: string }) {
       <path d="M40 85 L44 77.5 L48 86 Z M60 85 L56 77.5 L52 86 Z" fill={INK} />
       <path d="M35 76 Q50 81 65 76" stroke={GOLD} strokeWidth={1} fill="none" />
 
+      {/* Head and hat drawn larger than life, so the face dominates the card. */}
+      <g transform="translate(0 3) translate(50 40) scale(1.2) translate(-50 -40)">
       {/* Hat: black on the left, crimson on the right, bells hanging low. */}
       <path d="M36 50 C28 42 21 36 15 40 C14 45 17 50 19 54 C22 46 29 45 38 53 Z" fill={INK} stroke="#000" strokeWidth={0.8} />
       <path d="M64 50 C72 42 79 36 85 40 C86 45 83 50 81 54 C78 46 71 45 62 53 Z" fill={CRIMSON} stroke={INK} strokeWidth={0.8} />
@@ -100,25 +123,37 @@ function Jester({ vampire, grad }: { vampire: boolean; grad: string }) {
         [48.5, 19],
       ].map(([cx, cy]) => (
         <g key={`${cx}`}>
-          <circle cx={cx} cy={cy} r={3.4} fill={`url(#${grad})`} stroke={GOLD_DARK} strokeWidth={0.6} />
+          <circle cx={cx} cy={cy} r={3.4} fill={`url(#${ids.gold})`} stroke={GOLD_DARK} strokeWidth={0.6} />
           <path d={`M${cx - 1.6} ${cy + 1.2} h3.2`} stroke={GOLD_DARK} strokeWidth={0.6} />
         </g>
       ))}
 
-      {/* Face: pale, narrow chin, pointed ears, wide toothy grin. */}
-      <path d="M37.5 58 L33 54 L38 62 Z M62.5 58 L67 54 L62 62 Z" fill={BONE} stroke={INK} strokeWidth={0.7} />
-      <path d="M38 56 Q38 49 50 49 Q62 49 62 56 Q62 66 56 72 Q50 76 44 72 Q38 66 38 56 Z" fill={BONE} stroke={INK} strokeWidth={1} />
-      <path d="M41.5 56.5 L47 55 L46.5 58.2 Q43.5 59.5 41.5 56.5 Z M58.5 56.5 L53 55 L53.5 58.2 Q56.5 59.5 58.5 56.5 Z" fill={INK} />
-      <circle cx={45} cy={57} r={0.9} fill={vampire ? "#ff2a3a" : "#e2b33a"} />
-      <circle cx={55} cy={57} r={0.9} fill={vampire ? "#ff2a3a" : "#e2b33a"} />
-      <path d="M40.5 53.6 L47.5 54.6 M59.5 53.6 L52.5 54.6" stroke={INK} strokeWidth={1.2} strokeLinecap="round" />
-      <path d="M44 59.5 L43.2 63 M56 59.5 L56.8 63" stroke={INK} strokeWidth={0.5} opacity={0.6} />
-      <path d="M49.4 58.5 L50 63 L50.8 58.5" fill="none" stroke={INK} strokeWidth={0.5} opacity={0.5} />
-      {/* The grin. */}
-      <path d="M40.5 63.5 Q50 72.5 59.5 63.5 Q56 70.5 50 70.8 Q44 70.5 40.5 63.5 Z" fill={CRIMSON} stroke={INK} strokeWidth={0.8} />
-      <path d="M42.2 64.6 Q50 70.6 57.8 64.6 L57 66.4 Q50 70 43 66.4 Z" fill="#fff" />
-      <path d="M45 65.6 V67.6 M47.5 66.3 V68.6 M50 66.6 V69 M52.5 66.3 V68.6 M55 65.6 V67.6" stroke={INK} strokeWidth={0.4} />
-      {vampire && <path d="M44.4 66.2 l1 3.2 l1 -2.8 M53.6 66.2 l1 2.8 l1 -3.2" fill="#fff" stroke={INK} strokeWidth={0.5} />}
+      {/* Face: gaunt and shadowed, hollow eyes that glow, a grin cut up to the ears. */}
+      <path d="M38.2 57 L31 50.5 L38.8 63.5 Z M61.8 57 L69 50.5 L61.2 63.5 Z" fill={`url(#${ids.skin})`} stroke={INK} strokeWidth={0.7} />
+      <path d="M38 55 Q37 47.5 50 47.5 Q63 47.5 62 55 Q62.5 65 57.5 72.5 Q50 78.5 42.5 72.5 Q37.5 65 38 55 Z" fill={`url(#${ids.skin})`} stroke={INK} strokeWidth={1} />
+      <path d="M40 61.5 Q42.5 65.5 44.8 64 M60 61.5 Q57.5 65.5 55.2 64" stroke="#5e554a" strokeWidth={0.7} fill="none" opacity={0.6} />
+      {/* Cracks in the paint. */}
+      <path d="M53.5 48.2 L54.8 50.8 L53.6 52.4 L55.4 54.6 M39.2 62 L40.8 63.6 L40 65.4" stroke="#3a332c" strokeWidth={0.45} fill="none" />
+      {/* Hollow sockets with runny black paint. */}
+      <path d="M39.6 55.2 Q43.6 51.6 47.8 54.4 Q47.8 59.8 43.6 60.4 Q40.2 59.4 39.6 55.2 Z M60.4 55.2 Q56.4 51.6 52.2 54.4 Q52.2 59.8 56.4 60.4 Q59.8 59.4 60.4 55.2 Z" fill="#070405" />
+      <path d="M42.2 60 Q42.6 63 41.9 66 M57.8 60 Q57.4 63 58.1 66.4" stroke="#070405" strokeWidth={1.1} strokeLinecap="round" opacity={0.75} />
+      <path d="M38.8 53 L48.2 55.4 M61.2 53 L51.8 55.4" stroke={INK} strokeWidth={1.7} strokeLinecap="round" />
+      <g filter={`url(#${ids.eyeGlow})`}>
+        <circle cx={44.2} cy={57} r={1.35} fill={eye} />
+        <circle cx={55.8} cy={57} r={1.35} fill={eye} />
+      </g>
+      <path d="M44.2 55.9 V58.1 M55.8 55.9 V58.1" stroke="#000" strokeWidth={0.45} />
+      <path d="M49.1 60.4 l.6 1.7 M50.9 60.4 l-.6 1.7" stroke={INK} strokeWidth={0.6} strokeLinecap="round" />
+      {/* The grin: a dark mouth from cheek to cheek, cut further toward the ears. */}
+      <path d="M37.6 61 L35 56.8 M62.4 61 L65 56.8" stroke={CRIMSON} strokeWidth={1.1} strokeLinecap="round" />
+      <path d="M35.6 58.2 l1.4 -.8 M36.6 59.8 l1.4 -.8 M64.4 58.2 l-1.4 -.8 M63.4 59.8 l-1.4 -.8" stroke={INK} strokeWidth={0.45} />
+      <path d={MOUTH} fill="#120608" stroke={CRIMSON} strokeWidth={1} strokeLinejoin="round" />
+      <path d={UPPER_TEETH} fill="#efe8d6" stroke={INK} strokeWidth={0.3} strokeLinejoin="round" />
+      <path d={LOWER_TEETH} fill="#e6dcc4" stroke={INK} strokeWidth={0.3} strokeLinejoin="round" />
+      {vampire && <path d="M44.6 66.6 l.9 4 l1 -3.6 M53.5 67 l1 3.6 l.9 -4" fill="#fff" stroke={INK} strokeWidth={0.4} />}
+      {/* Blood running from the corners of the mouth. */}
+      <path d="M41.6 69.4 Q42.4 72 42 75.2 A1 1 0 1 0 44 75.2 Q43.6 72.4 43.4 70.6 Z M57.4 69.8 Q56.8 71.6 57.2 73.4 A0.9 0.9 0 1 0 58.9 73.4 Q58.8 71.6 58.6 69.4 Z" fill="#9c0b18" />
+      </g>
     </>
   );
 }
@@ -271,6 +306,9 @@ export default function JokerIcon({ id, className = "w-12" }: { id: JokerId; cla
   const lattice = `lattice-${uid}`;
   const glow = `glow-${uid}`;
   const gold = `gold-${uid}`;
+  const skin = `skin-${uid}`;
+  const eyeGlow = `eye-${uid}`;
+  const vignette = `vig-${uid}`;
   const accent = ACCENT[id];
   return (
     <span className={`block aspect-[5/7] shrink-0 ${className}`} aria-hidden>
@@ -282,8 +320,25 @@ export default function JokerIcon({ id, className = "w-12" }: { id: JokerId; cla
             <circle cx="5" cy="5" r="1" fill={CRIMSON} opacity={0.55} />
           </pattern>
           <radialGradient id={glow} cx="50%" cy="45%" r="55%">
-            <stop offset="0%" stopColor={accent} stopOpacity={0.55} />
+            <stop offset="0%" stopColor={accent} stopOpacity={0.4} />
             <stop offset="100%" stopColor={accent} stopOpacity={0} />
+          </radialGradient>
+          <radialGradient id={skin} cx="50%" cy="38%" r="62%">
+            <stop offset="0%" stopColor="#f7f2e6" />
+            <stop offset="70%" stopColor="#d8d0bf" />
+            <stop offset="100%" stopColor="#8f8676" />
+          </radialGradient>
+          <filter id={eyeGlow} x="-200%" y="-200%" width="500%" height="500%">
+            <feGaussianBlur stdDeviation="1.1" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <radialGradient id={vignette} cx="50%" cy="45%" r="70%">
+            <stop offset="45%" stopColor="#000" stopOpacity={0} />
+            <stop offset="100%" stopColor="#000" stopOpacity={0.75} />
           </radialGradient>
           <radialGradient id={gold} cx="35%" cy="35%" r="70%">
             <stop offset="0%" stopColor="#fff1b8" />
@@ -301,8 +356,9 @@ export default function JokerIcon({ id, className = "w-12" }: { id: JokerId; cla
 
         <rect x={8} y={14} width={84} height={112} rx={2} fill={`url(#${lattice})`} stroke={INK} strokeWidth={1} />
         <rect x={8} y={14} width={84} height={112} rx={2} fill={`url(#${glow})`} />
+        <rect x={8} y={14} width={84} height={112} rx={2} fill={`url(#${vignette})`} />
         <svg x={8} y={14} width={84} height={112} viewBox="8 14 84 112" overflow="hidden">
-          <Jester vampire={id === "vampir"} grad={gold} />
+          <Jester vampire={id === "vampir"} ids={{ gold, skin, eyeGlow }} />
           <Props id={id} accent={accent} />
         </svg>
         <rect x={10} y={16} width={80} height={108} rx={1.5} fill="none" stroke={GOLD} strokeWidth={0.5} opacity={0.6} />
