@@ -91,11 +91,30 @@ function others(channel: RealtimeChannel, role: Role): Presence[] {
     .filter((p) => p.role !== role);
 }
 
-async function openChannel(code: string, role: Role): Promise<{ channel: RealtimeChannel; link: Link }> {
+/** Opens of the same room run one at a time; see openChannelNow. */
+const opening = new Map<string, Promise<unknown>>();
+
+function openChannel(code: string, role: Role): Promise<{ channel: RealtimeChannel; link: Link }> {
+  const prev = opening.get(code) ?? Promise.resolve();
+  const next = prev.catch(() => undefined).then(() => openChannelNow(code, role));
+  opening.set(code, next);
+  void next
+    .catch(() => undefined)
+    .then(() => {
+      if (opening.get(code) === next) opening.delete(code);
+    });
+  return next;
+}
+
+async function openChannelNow(code: string, role: Role): Promise<{ channel: RealtimeChannel; link: Link }> {
   const sb = supabase();
   if (!sb) throw new RoomError("no-server");
 
-  const channel = sb.channel(`kartuduel-room-${code}`, {
+  // supabase-js hands back an existing channel for the same topic, already subscribed or
+  // half torn down; a fresh one is the only kind that reliably subscribes again.
+  const topic = `kartuduel-room-${code}`;
+  await Promise.all(sb.getChannels().filter((c) => c.topic === `realtime:${topic}`).map((c) => sb.removeChannel(c)));
+  const channel = sb.channel(topic, {
     // A stable key per tab, so a reload rejoins as the same player rather than a second one.
     config: { broadcast: { self: false, ack: false }, presence: { key: `${role}-${presenceId()}` } },
   });
@@ -148,7 +167,16 @@ async function openChannel(code: string, role: Role): Promise<{ channel: Realtim
     link.close();
     throw err;
   });
-  await channel.track({ role } satisfies Presence);
+  // A dropped socket can leave track() pending forever; give up like a failed subscribe.
+  try {
+    await Promise.race([
+      channel.track({ role } satisfies Presence),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new RoomError("network")), JOIN_TIMEOUT)),
+    ]);
+  } catch (err) {
+    link.close();
+    throw err;
+  }
 
   // Coming back from another app: announce ourselves again in case the socket dropped meanwhile.
   const onVisible = () => {

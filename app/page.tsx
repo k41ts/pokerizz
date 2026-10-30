@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PrimaryButton } from "@/components/ui";
 import AccountSheet from "@/components/AccountSheet";
 import Matchmaking from "@/components/Matchmaking";
@@ -11,7 +11,7 @@ import Menu from "@/components/Menu";
 import Tutorial from "@/components/Tutorial";
 import { useAccount } from "@/lib/account";
 import type { GameState } from "@/lib/game";
-import { describeError, joinRoom, normalizeCode, rehostRoom, send } from "@/lib/net";
+import { describeError, joinRoom, normalizeCode, rehostRoom, send, type Link } from "@/lib/net";
 import { clearMatch, loadMatch } from "@/lib/resume";
 import { setSoundSkin } from "@/lib/sound";
 
@@ -22,7 +22,7 @@ type Screen =
   | { kind: "bot"; opponent: BotOpponent; id: number; resume?: { state: GameState; botMatchId: string | null } }
   | ({ kind: "online"; resume?: { state: GameState; matchId: string } } & Connected)
   /** Reopening the room of a match that was running before the page reloaded. */
-  | { kind: "resuming"; error: string | null };
+  | { kind: "resuming"; error: string | null; seconds?: number };
 
 /** Where a guest was heading when they were asked to sign in first. */
 type Gated = "search" | "lobby";
@@ -56,6 +56,8 @@ export default function Home() {
   const [skinsOpen, setSkinsOpen] = useState(false);
   const [pending, setPending] = useState<Gated | null>(null);
   const account = useAccount();
+  /** Bumped when a reconnect is cancelled, so a late answer from the room is ignored. */
+  const resumeAttempt = useRef(0);
 
   /** Continue the match that was running before the page reloaded. */
   function resumeMatch(saved: NonNullable<ReturnType<typeof loadMatch>>) {
@@ -64,9 +66,20 @@ export default function Home() {
       return;
     }
     setScreen({ kind: "resuming", error: null });
+    const attempt = ++resumeAttempt.current;
+    const current = () => attempt === resumeAttempt.current;
+    const onSearching = (seconds: number) => {
+      if (current()) setScreen({ kind: "resuming", error: null, seconds });
+    };
+    const keep = (link: Link) => {
+      if (current()) return true;
+      link.close();
+      return false;
+    };
     const rejoin =
       saved.kind === "host"
         ? rehostRoom(saved.code).then((link) =>
+            keep(link) &&
             setScreen({
               kind: "online",
               role: "host",
@@ -78,8 +91,9 @@ export default function Home() {
               resume: { state: saved.state, matchId: saved.matchId },
             }),
           )
-        : joinRoom(saved.code).then((link) => setScreen({ kind: "online", role: "guest", code: saved.code, link }));
+        : joinRoom(saved.code, onSearching).then((link) => keep(link) && setScreen({ kind: "online", role: "guest", code: saved.code, link }));
     rejoin.catch((err) => {
+      if (!current()) return;
       clearMatch();
       setScreen({ kind: "resuming", error: describeError(err) });
     });
@@ -227,9 +241,23 @@ export default function Home() {
             <PrimaryButton onClick={() => setScreen({ kind: "menu" })}>Ke menu</PrimaryButton>
           </div>
         ) : (
-          <p className="flex items-center gap-2 text-base text-ink/70">
-            <span className="animate-pulse-dot size-2 rounded-full bg-signal" /> Nyambung lagi ke pertandinganmu…
-          </p>
+          <div className="flex max-w-sm flex-col items-center gap-5">
+            <p className="flex items-center gap-2 text-base text-ink/70">
+              <span className="animate-pulse-dot size-2 rounded-full bg-signal" /> Nyambung lagi ke pertandinganmu…
+              {!!screen.seconds && <span className="tabular-nums">{screen.seconds} dtk</span>}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                resumeAttempt.current++;
+                clearMatch();
+                setScreen({ kind: "menu" });
+              }}
+              className="press rounded-full bg-paper px-5 py-2.5 text-base font-semibold ring-1 ring-ink/15"
+            >
+              Batal, ke menu
+            </button>
+          </div>
         )}
       </main>
     );
