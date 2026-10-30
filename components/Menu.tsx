@@ -211,7 +211,7 @@ export default function Menu({
                   <span className="text-signal">★</span> {profile.stars}
                 </p>
                 <p className="text-base text-paper/70">
-                  {profile.wins} menang, {profile.losses} kalah. Di Cari lawan: menang +1 bintang, kalah −1.
+                  {profile.wins} menang, {profile.losses} kalah. Di Cari lawan dan Main sama teman: menang +1 bintang, kalah −1.
                 </p>
                 <button
                   type="button"

@@ -204,7 +204,7 @@ const SLIDES = [
   },
   {
     title: "Joker dan bintang",
-    body: "Tiap 3 ronde pilih satu Joker buat bonus. Di Cari lawan, menang +1 bintang dan kalah −1. Poin dari tiap match bisa buat buka skin kartu.",
+    body: "Tiap 3 ronde pilih satu Joker buat bonus. Di Cari lawan dan Main sama teman, menang +1 bintang dan kalah −1. Poin dari tiap match bisa buat buka skin kartu.",
     Demo: JokerDemo,
   },
 ];

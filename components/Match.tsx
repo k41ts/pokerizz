@@ -177,7 +177,7 @@ function useRankNote(view: GameState | null, me: PlayerIndex, meta: Meta | null,
   if (winner === undefined) return null;
   if (!ranked) return { kind: "unranked", text: "Main pakai akun berdua biar menang dapat bintang dan poin." };
   if (winner === null) return { kind: "unranked", text: "Seri, ga ada bintang." };
-  return winner === me ? { kind: "star", text: "+1 bintang · +30 poin" } : { kind: "loss", text: "Kekalahan dicatat · +10 poin" };
+  return winner === me ? { kind: "star", text: "+1 bintang · +30 poin" } : { kind: "loss", text: "−1 bintang · +10 poin" };
 }
 
 function newMatchId() {
